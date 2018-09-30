@@ -105,8 +105,28 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+	// El limite es la cantidad de paginas x su tamaño (memoria fisica)
+	uint32_t top_limit = npages*PGSIZE;
+	// Me guardo el offset actual
+	uint32_t offset = (uint32_t) nextfree;
+	// Obtengo la direccion virtual a la que llegaria con n + offset
+	uint32_t actual_dir = ROUNDUP(n, PGSIZE) + offset;
+	// La transformo a direccion fisica para compararla con top_limit
+	physaddr_t actual_pa = PADDR((char *) actual_dir);
 
-	return NULL;
+	if (actual_pa > top_limit) {
+		panic("No hay suficiente memoria física\n");
+	}
+	// Si n==0 devuelvo la proxima pagina libre
+	if (n==0) {
+		return nextfree;
+	} else {
+		// Me guardo la posicion actual de nextfree para luego devolverlo
+		result = nextfree;
+		// Avanzo nextfree n bytes y redondeo (alineo) a 4096 bytes
+		nextfree += ROUNDUP(n, PGSIZE);
+		return result;
+	}
 }
 
 // Set up a two-level page table:
@@ -128,7 +148,7 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
+	// panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -153,7 +173,8 @@ mem_init(void)
 	// memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-
+	pages = boot_alloc(npages*sizeof(struct PageInfo));
+	memset(pages, 0, npages*sizeof(struct PageInfo));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -258,14 +279,32 @@ page_init(void)
 	// free pages!
 	size_t i;
 	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
+		// nextfree page physicall address
+		physaddr_t first_free_page = PADDR((char *) boot_alloc(0));
+		// actual page physicall address
+		physaddr_t page_pa = page2pa(&pages[i]);
+		
+		// Las siguientes condiciones me indican memoria invalida:
+		// - Pagina 0
+		bool first_page = i==0;
+		// - Espacio para I/O (desde IOPHYSMEM hasta EXTPHYSMEM)
+		bool io_space = page_pa >= IOPHYSMEM && page_pa <= EXTPHYSMEM;
+		// - Espacio para el kernel y boot_alloc (desde EXTPHYSMEM hasta nextfree)
+		bool kernel_boot_alloc_space = page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
+		
+		// No las agrego a la lista de paginas libres
+		bool invalid_page = first_page || io_space || kernel_boot_alloc_space;
+		if (invalid_page) {
+			continue;
+		}
+		// Armo la lista enlazada de paginas libres
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
 	}
 }
 
 //
-// Allocates a physical page.  If (alloc_flags & ALLOC_ZERO), fills the entire
+// Allocates a physical page.  If (alloc_flags == ALLOC_ZERO), fills the entire
 // returned physical page with '\0' bytes.  Does NOT increment the reference
 // count of the page - the caller must do these if necessary (either explicitly
 // or via page_insert).
@@ -279,8 +318,24 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	// Fill this function in
-	return 0;
+	// Saco la pagina libre cabeza de la lista
+	struct PageInfo *free_page = page_free_list;
+	if (!free_page) {
+		return NULL;
+	}
+	// Actualizo la cabeza de la lista de paginas libres
+	page_free_list = free_page->pp_link;
+	// Dereferencio la pagina que saque
+	free_page->pp_link = NULL;
+
+	// Una vez que sacamos la pagina de la lista de paginas libres,
+	// podemos decir que esta alocada en la memoria fisica
+
+	// Escribimos en memoria virtual los caracteres correspondientes
+	if (alloc_flags==ALLOC_ZERO) {
+		memset(page2kva(free_page), '\0', PGSIZE);
+	}
+	return free_page;
 }
 
 //
@@ -293,6 +348,22 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+
+	// Si la pagina recibida tiene algun link, quiere decir que
+	// esta en la lista de paginas libres
+	if (pp->pp_ref != 0 || pp->pp_link) {
+		panic("La pagina recibida ya se encuentra libre");
+	}
+
+	// Me guardo la anterior cabeza de la lista
+	struct PageInfo *prev_page_free_list = page_free_list;
+	// Actualizo la cabeza de la lista
+	page_free_list = pp;
+	// Referencio la cabeza de la lista
+	pp->pp_link = prev_page_free_list;
+
+	// Una vez que agregamos la pagina a la lista de paginas libres,
+	// podemos decir que no esta alocada en la memoria fisica
 }
 
 //
@@ -334,6 +405,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	// Fill this function in
 	return NULL;
 }
+
 
 //
 // Map [va, va+size) of virtual address space to physical [pa, pa+size)

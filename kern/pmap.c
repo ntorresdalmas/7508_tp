@@ -413,7 +413,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	// Si no esta el bit de presencia (PTE_P) --> no hay page table asociada a la page directory
 	if (!(pgdir[pgdir_offset] & PTE_P)) {
 		// Si create == 0 --> devuelvo null y no hago nada
-		if (!create) {
+		if (create==0) {
 			return NULL;
 		}
 		// Creo una nueva page table
@@ -423,8 +423,8 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		}
 		new_page_table->pp_ref ++;
 		// Cargo en el registro de la page directory la direccion fisica de la nueva page table
-		pgdir[pgdir_offset] = page2pa(new_page_table);
-		// TO DO: ver si hay que modificar PTE_P (asignarle un 1 o algo asi)
+		// Y le asigno el bit de presencia (PTE_P) y los permisos (PTE_U y PTE_W)
+		pgdir[pgdir_offset] = page2pa(new_page_table) | PTE_P | PTE_U | PTE_W;
 		// Convierto la nueva page table a virtual address
 		pgtab_addr = page2kva(new_page_table);
 	} else {
@@ -503,28 +503,25 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	uint32_t offset = PGOFF(va);
+	// Me guardo el offset en la memoria fisica (ultimos 12 bits de va)
+	int phys_offset = PGOFF(va);
 
-	//obtengo la direccion del pgtable
-	pte_t *pgtab_direccion = pgdir_walk(pgdir, va, 1);
-	if (!pgtab_direccion){
+	// Obtengo la direccion de la page table entry
+	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 0);
+	if (!pgtab_addr){
 		return NULL;
 	}
+	// Obtengo la direccion fisica a donde apunta el page table entry
+	physaddr_t pgtable_phys_addr = PTE_ADDR(*pgtab_addr);
+	// Le sumo el offset y obtengo la direccion fisica apuntada por el struct PageInfo
+	physaddr_t page_phys_addr = pgtable_phys_addr + phys_offset;
 
-	//me quedo con los 20 bits de lo que hay en el pagetable y el resto cero, esto es para sumarlo abajo con el offset
-	physaddr_t pgtab_direc20 = PTE_ADDR(pgtab_direccion);
-	//sumando lo de arriba con el offset, obtengo la verdadera direccion virtual en memoria.
-	physaddr_t va_mem = pgtab_direc20 + offset;
-
+	// Guardo la direccion fisica del page table entry en pte_store
 	if (pte_store != 0){
-		//agrego a pte_store el physical address
-		size_t len = sizeof(pte_store)/sizeof(*pte_store);	//lo saque de internet
-		pte_store[len] = va_mem;
-		//OJO porque si el pte_store ya tiene elementos no puedo hacer un pte_store[0] = va_mem. tendria que haber un .append()		
+		// pte_store = PADDR(pgtab_addr);
 	}
-
-	return pa2page(va_mem);
-
+	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida 
+	return pa2page(page_phys_addr);
 }
 
 //

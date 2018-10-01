@@ -499,8 +499,28 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// Fill this function in
-	return NULL;
+	uint32_t offset = PGOFF(va);
+
+	//obtengo la direccion del pgtable
+	pte_t *pgtab_direccion = pgdir_walk(pgdir, va, 1);
+	if (!pgtab_direccion){
+		return NULL;
+	}
+
+	//me quedo con los 20 bits de lo que hay en el pagetable y el resto cero, esto es para sumarlo abajo con el offset
+	physaddr_t pgtab_direc20 = PTE_ADDR(pgtab_direccion);
+	//sumando lo de arriba con el offset, obtengo la verdadera direccion virtual en memoria.
+	physaddr_t va_mem = pgtab_direc20 + offset;
+
+	if (pte_store != 0){
+		//agrego a pte_store el physical address
+		size_t len = sizeof(pte_store)/sizeof(*pte_store);	//lo saque de internet
+		pte_store[len] = va_mem;
+		//OJO porque si el pte_store ya tiene elementos no puedo hacer un pte_store[0] = va_mem. tendria que haber un .append()		
+	}
+
+	return pa2page(va_mem);
+
 }
 
 //

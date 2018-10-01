@@ -402,8 +402,37 @@ page_decref(struct PageInfo *pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Fill this function in
-	return NULL;
+	// TO DO: ver si estos offset se multiplican por 4 bytes o no
+	// Me guardo el offset en la page directory (primeros 10 bits de va)
+	pde_t *pdgir_offset = (pde_t *) PDX(va)*4;
+	// Me guardo el offset en la page table (segundos 10 bits de va)
+	pte_t *pgtab_offset = (pte_t *) PTX(va)*4;
+	
+	// Obtengo la posicion en la page directory
+	pde_t *pdgir_direccion = pgdir + pdgir_offset;
+	// Me guardo la direccion fisica de la page table (primeros 20 bits del registro del page directory)
+	physaddr_t *pgtable_phys_addr = PGNUM(pdgir_direccion);
+
+	// Si es nulo, no hay page table asociada
+	// TO DO: ver bien que se le pasa a este if
+	if (!pgtable_phys_addr) {
+		// Si create == 0 devuelvo null y no hago nada
+		if (!create) {
+			return NULL;
+		}
+		// Creo una nueva page table
+		struct PageInfo *new_page_table = page_alloc(0);
+		if (!new_page_table) {
+			return NULL;
+		}
+		// Aumento en 1 su pp_ref
+		new_page_table->pp_ref ++;
+		// Devuelvo la direccion virtual de la nueva page table
+		return page2kva(new_page_table);
+	} else {
+		pte_t *pgtab_direccion = KADDR(pgtable_phys_addr + pgtab_offset);
+		return pgtab_direccion;
+	}
 }
 
 

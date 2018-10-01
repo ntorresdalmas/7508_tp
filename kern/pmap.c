@@ -485,9 +485,29 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	// Fill this function in
+	// Me guardo el offset en la page directory (primeros 10 bits de va)
+	int pgdir_offset = PDX(va);
+	
+	// Obtengo la direccion de la page table entry
+	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 0);
+	// si no es NULL, tengo que sacar la va que este y poner esta
+	if (pgtab_addr){
+		page_remove(pgdir,va);
+	}
+	//hay que usar page_alloc(0); ?
+	//de ser NO la respuesta no entiendo cuando fallaria esta funcion, para tirar el return E_NO_MEM
+	if (!pp){
+		return E_NO_MEM;
+	}
+	// aca no entendi lo de The permissions (the low 12 bits) of the page table entry should be set to 'perm|PTE_P'.
+	// cargo en pgdir la direcion fisica de la pp.
+	pp->pp_ref ++;
+	pgdir[pgdir_offset] = page2pa(pp) |PTE_P | PTE_U | PTE_W;
+
+	// no entendi el 4 requerimiento.  - The TLB must be invalidated if a page was formerly present at 'va'.
 	return 0;
 }
+
 
 //
 // Return the page mapped at virtual address 'va'.
@@ -542,7 +562,23 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	// Fill this function in
+	// Me guardo el offset en la page directory (primeros 10 bits de va)
+	int pgdir_offset = PDX(va);
+
+	//obtengo la pagina
+	struct PageInfo *pp = page_lookup(pgdir, va, 0);
+	//si no existe, no hace nada.
+	if (!pp){
+		return;
+	}
+	//decremento el pp_ref y lo libero si es igual a cero.
+	page_decref(pp);
+
+	//Cargo en el registro de la page directory un cero. el detalle 3.
+	pgdir[pgdir_offset] = 0;
+
+	//lo puse porque lo dice, ni idea que hace sinceramente.
+	tlb_invalidate(pgdir, va);
 }
 
 //

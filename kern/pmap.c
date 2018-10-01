@@ -402,21 +402,17 @@ page_decref(struct PageInfo *pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// TO DO: ver si estos offset se multiplican por 4 bytes o no
-	// Me guardo el offset en la page directory (primeros 10 bits de va)
-	pde_t *pdgir_offset = (pde_t *) PDX(va)*4;
-	// Me guardo el offset en la page table (segundos 10 bits de va)
-	pte_t *pgtab_offset = (pte_t *) PTX(va)*4;
+	// Page table entry (aca se carga la virtual addres de la page table)
+	pte_t *pgtab_addr;
 	
-	// Obtengo la posicion en la page directory
-	pde_t *pdgir_direccion = pgdir + pdgir_offset;
-	// Me guardo la direccion fisica de la page table (primeros 20 bits del registro del page directory)
-	physaddr_t *pgtable_phys_addr = PGNUM(pdgir_direccion);
-
-	// Si es nulo, no hay page table asociada
-	// TO DO: ver bien que se le pasa a este if
-	if (!pgtable_phys_addr) {
-		// Si create == 0 devuelvo null y no hago nada
+	// Me guardo el offset en la page directory (primeros 10 bits de va)
+	int pgdir_offset = PDX(va);
+	// Me guardo el offset en la page table (segundos 10 bits de va)
+	int pgtab_offset = PTX(va);
+	
+	// Si no esta el bit de presencia (PTE_P) --> no hay page table asociada a la page directory
+	if (!(pgdir[pgdir_offset] & PTE_P)) {
+		// Si create == 0 --> devuelvo null y no hago nada
 		if (!create) {
 			return NULL;
 		}
@@ -425,14 +421,22 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		if (!new_page_table) {
 			return NULL;
 		}
-		// Aumento en 1 su pp_ref
 		new_page_table->pp_ref ++;
-		// Devuelvo la direccion virtual de la nueva page table
-		return page2kva(new_page_table);
+		// Cargo en el registro de la page directory la direccion fisica de la nueva page table
+		pgdir[pgdir_offset] = page2pa(new_page_table);
+		// TO DO: ver si hay que modificar PTE_P (asignarle un 1 o algo asi)
+		// Convierto la nueva page table a virtual address
+		pgtab_addr = page2kva(new_page_table);
 	} else {
-		pte_t *pgtab_direccion = KADDR(pgtable_phys_addr + pgtab_offset);
-		return pgtab_direccion;
+		// Me guardo la direccion fisica de la page table asociada (primeros 20 bits del registro del page directory)
+		// pgdir[pgdir_offset] es la posicion dentro del page directory --> = pgdir + pgdir_offset
+		physaddr_t pgtable_phys_addr = PTE_ADDR(pgdir[pgdir_offset]);
+		
+		// Convierto la direccion fisica de la page table a virtual address
+		pgtab_addr = KADDR(pgtable_phys_addr);
 	}
+	// Devuelvo la virtual address obtenida + el offset
+	return pgtab_addr + pgtab_offset;
 }
 
 

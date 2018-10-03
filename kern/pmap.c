@@ -533,10 +533,10 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 
 	// Guardo la direccion fisica del page table entry en pte_store
 	if (pte_store != 0){
-		// pte_store = PADDR(pgtab_addr);
+		*pte_store = pgtab_addr;
 	}
 	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida 
-	return pa2page(page_phys_addr);
+	return pa2page(pgtable_phys_addr);
 }
 
 //
@@ -558,7 +558,9 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Obtengo la pagina mapeada en va
-	struct PageInfo *mapped_page = page_lookup(pgdir, va, 0);
+	// Me guardo en pgtab_addr el la page table entry
+	pte_t *pgtab_addr;
+	struct PageInfo *mapped_page = page_lookup(pgdir, va, &pgtab_addr);
 	if (!mapped_page){
 		return;
 	}
@@ -566,7 +568,6 @@ page_remove(pde_t *pgdir, void *va)
 	page_decref(mapped_page);
 
 	// Seteo el page table entry en 0
-	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 0);
 	*pgtab_addr = 0;
 
 	// Invalido la TLB

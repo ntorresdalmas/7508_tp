@@ -454,6 +454,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
+	/*
 	void *actual_va;
 	physaddr_t actual_pa;
 	size_t i;
@@ -467,6 +468,21 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
 		*pgtab_addr = actual_pa | perm | PTE_P;
 	}
+	*/
+
+	// Obtengo la direccion de la primera page table entry
+	pte_t *pgtab_addr_first = pgdir_walk(pgdir, (void*)va, 1);
+	// Referencio la primera page table entry con la direccion fisica primera (+los bits de permiso)
+	*pgtab_addr_first = pa | perm | PTE_P;
+
+	// Las sumo asi nomas ya que dice que la size esta alineada junto con la va & pa.
+	void *final_va = (void*)va + size;
+	physaddr_t final_pa = pa + size;
+	// Obtengo la direccion de la ultima page table entry de mi "region"
+	pte_t *pgtab_addr_final = pgdir_walk(pgdir, final_va, 1);
+	// Referencio la ultima page table entry con la direccion fisica ultima tambien  (+los bits de permiso)
+	*pgtab_addr_final = final_pa | perm | PTE_P;
+
 }
 
 //

@@ -417,7 +417,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 			return NULL;
 		}
 		// Creo una nueva page table
-		struct PageInfo *new_page_table = page_alloc(0);
+		struct PageInfo *new_page_table = page_alloc(ALLOC_ZERO);
 		if (!new_page_table) {
 			return NULL;
 		}
@@ -490,13 +490,14 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 1);
 	// Si la page table no pudo ser alocada, devuelvo error de memoria
 	if (!pgtab_addr) {
-		return -E_NO_MEM;
+		return ~E_NO_MEM;
 	}
+	// Aumento el pp_ref antes de removerla por si ya tenia la misma pte.
+	pp->pp_ref++;
 	// Si ya hay una page (bit de presencia PTE_P), la remuevo
 	if (*pgtab_addr & PTE_P) {
 		page_remove(pgdir, va);
 	}
-	pp->pp_ref++;
 	// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
 	*pgtab_addr = page2pa(pp) | perm | PTE_P;
 

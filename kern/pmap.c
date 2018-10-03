@@ -454,7 +454,19 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	// Fill this function in
+	void *actual_va;
+	physaddr_t actual_pa;
+	size_t i;
+	for (i=0; i<=size; i++) {
+		// Me voy moviendo de a PGSIZE bytes [va, va+size)
+		actual_va = (void *) va + i*PGSIZE;
+		// Me voy moviendo de a PGSIZE bytes [pa, pa+size)
+		actual_pa = pa + i*PGSIZE;
+		// Obtengo la direccion de la page table entry
+		pte_t *pgtab_addr = pgdir_walk(pgdir, actual_va, 0);
+		// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
+		*pgtab_addr = actual_pa | perm | PTE_P;
+	}
 }
 
 //
@@ -492,7 +504,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	if (!pgtab_addr) {
 		return ~E_NO_MEM;
 	}
-	// Aumento el pp_ref antes de removerla por si ya tenia la misma pte.
+	// Aumento el pp_ref antes de removerla por si ya tenia la misma page table entry
 	pp->pp_ref++;
 	// Si ya hay una page (bit de presencia PTE_P), la remuevo
 	if (*pgtab_addr & PTE_P) {
@@ -537,7 +549,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 		*pte_store = pgtab_addr;
 	}
 	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida 
-	return pa2page(pgtable_phys_addr);
+	return pa2page(page_phys_addr);
 }
 
 //

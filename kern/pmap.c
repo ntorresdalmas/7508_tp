@@ -222,7 +222,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-	boot_map_region(kern_pgdir, KERNBASE, (2^32) - KERNBASE, 0, PTE_W);
+	boot_map_region(kern_pgdir, KERNBASE, (1ULL << 32) - KERNBASE, 0, PTE_W);
 
 
 	// Check that the initial page directory has been set up correctly.
@@ -336,7 +336,9 @@ page_alloc(int alloc_flags)
 	// Una vez que sacamos la pagina de la lista de paginas libres,
 	// podemos decir que esta alocada en la memoria fisica
 
-	// Escribimos en memoria virtual los caracteres correspondientes
+	// Ponemos en 0 los 4KB (PGSIZE) de la pagina alocada
+	// Con esto limpiamos basura que haya quedado
+	// En particular algun bit PTE_P en 1
 	if (alloc_flags==ALLOC_ZERO) {
 		memset(page2kva(free_page), '\0', PGSIZE);
 	}
@@ -407,7 +409,7 @@ page_decref(struct PageInfo *pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Page table entry (aca se carga la virtual addres de la page table)
+	// Page table entry (aca se carga la virtual address de la page table)
 	pte_t *pgtab_addr;
 	
 	// Me guardo el offset en la page directory (primeros 10 bits de va)
@@ -422,6 +424,8 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 			return NULL;
 		}
 		// Creo una nueva page table
+		// Le paso ALLOC ZERO para que limpie basura que haya quedado
+		// y no me quede un falso PTE_P en 1
 		struct PageInfo *new_page_table = page_alloc(ALLOC_ZERO);
 		if (!new_page_table) {
 			return NULL;
@@ -576,7 +580,7 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Obtengo la pagina mapeada en va
-	// Me guardo en pgtab_addr el la page table entry
+	// Me guardo en pgtab_addr el page table entry
 	pte_t *pgtab_addr;
 	struct PageInfo *mapped_page = page_lookup(pgdir, va, &pgtab_addr);
 	if (!mapped_page){

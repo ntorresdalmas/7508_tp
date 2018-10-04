@@ -198,6 +198,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
+	boot_map_region(kern_pgdir, UPAGES, PTSIZE, PADDR(pages), PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -210,6 +211,9 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
+	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), 0);
+	// TO DO: ver los limites de esta region
+	boot_map_region(kern_pgdir, KSTACKTOP-PTSIZE, PTSIZE-KSTKSIZE, ~0, 0);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -219,6 +223,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+	boot_map_region(kern_pgdir, KERNBASE, (2^32) - KERNBASE, 0, 0);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -454,35 +459,22 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	/*
-	void *actual_va;
+	uintptr_t actual_va;
 	physaddr_t actual_pa;
-	size_t i;
-	for (i=0; i<=size; i++) {
-		// Me voy moviendo de a PGSIZE bytes [va, va+size)
-		actual_va = (void *) va + i*PGSIZE;
-		// Me voy moviendo de a PGSIZE bytes [pa, pa+size)
-		actual_pa = pa + i*PGSIZE;
+	uintptr_t i;
+	// Recorro las direcciones de a PGSIZE bytes
+	for (i=0; i<size; i+=PGSIZE) {
+		// Actualizo las direcciones virtuales y fisicas
+		actual_va = va + i;
+		actual_pa = pa + i;
 		// Obtengo la direccion de la page table entry
-		pte_t *pgtab_addr = pgdir_walk(pgdir, actual_va, 0);
+		pte_t *pgtab_addr = pgdir_walk(pgdir, (void *) actual_va, 1);
 		// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
-		*pgtab_addr = actual_pa | perm | PTE_P;
+		// Si recibe un ~0 no debe mapearse a ninguna direccion fisica
+		if (pa != ~0) {
+			*pgtab_addr = actual_pa | perm | PTE_P;
+		}
 	}
-	*/
-
-	// Obtengo la direccion de la primera page table entry
-	pte_t *pgtab_addr_first = pgdir_walk(pgdir, (void*)va, 1);
-	// Referencio la primera page table entry con la direccion fisica primera (+los bits de permiso)
-	*pgtab_addr_first = pa | perm | PTE_P;
-
-	// Las sumo asi nomas ya que dice que la size esta alineada junto con la va & pa.
-	void *final_va = (void*)va + size;
-	physaddr_t final_pa = pa + size;
-	// Obtengo la direccion de la ultima page table entry de mi "region"
-	pte_t *pgtab_addr_final = pgdir_walk(pgdir, final_va, 1);
-	// Referencio la ultima page table entry con la direccion fisica ultima tambien  (+los bits de permiso)
-	*pgtab_addr_final = final_pa | perm | PTE_P;
-
 }
 
 //

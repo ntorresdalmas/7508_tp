@@ -1,0 +1,406 @@
+diff --git a/TP1.md b/TP1.md
+index 4b64f1f..29bc321 100644
+--- a/TP1.md
++++ b/TP1.md
+@@ -3,19 +3,77 @@ TP1: Memoria virtual en JOS
+ 
+ page2pa
+ -------
++La función page2pa() mapea un struct PageInfo con la dirección física de la página a la que apunta.
++Esto lo logra mediante una aritmética de punteros y un corrimiento de bits.
+ 
+-...
++En primer lugar, al PageInfo recibido por parámetro se le resta la estructura Pages, obteniendo así el índice
++del PageInfo en cuestión dentro de la estructura Pages.
++
++Luego, con el corrimiento de bits, se localiza la dirección física de la página identificada.
++Considerando que la dirección física de una página se encuentra a partir del bit 12
++y que estamos tratando con una arquitectura Little Endian (el bit más representativo a derecha),
++tiene sentido que realicemos un desplazamiento a izquierda de PGSHIFT=12 bits.
+ 
+ 
+ boot_alloc_pos
+ --------------
++a. En la primera llamada a boot_alloc(), cuando se crea el page directory, nextfree esta como NULL, entonces
++hace una llamada a ROUNDUP de la ultima direccion de donde se cargo el kernel. Entonces en la terminal tiro un /obj/kern$nm kernel me tira la memoria " f011794c B pages " ya que las variables globales son lo ultimo que se cargan cuando se carga en kernel, a esta direccion (0xf0117950)[4027677008] se le hace un ROUNDUP, que alinea la direccion a PGSIZE(0x00001000)[4096], es decir, llega (0xf0119000)[4027682816].
++
+ 
+-...
++b. " $ make gdb
++gdb -q -s obj/kern/kernel -ex 'target remote 127.0.0.1:26000' -n -x .gdbinit
++Reading symbols from obj/kern/kernel...done.
++Remote debugging using 127.0.0.1:26000
++warning: No executable has been specified and target does not support
++determining executable automatically.  Try using the "file" command.
++0x0000fff0 in ?? ()
++(gdb) b boot_alloc
++Breakpoint 1 at 0xf0100b27: file kern/pmap.c, line 89.
++(gdb) c
++Continuing.
++The target architecture is assumed to be i386
++=> 0xf0100b27 <boot_alloc>:	push   %ebp
+ 
++Breakpoint 1, boot_alloc (n=0) at kern/pmap.c:89
++89	{
++(gdb) p nextfree
++$1 = 0x0
++(gdb) p (char*)end
++$2 = 0xf01006f6 <cons_init> "U\211\345\203\354\b\350\266\373\377\377\350\277\372\377\377\200=4u", <incomplete sequence \360>
++(gdb) display/i nextfree
++1: x/i nextfree
++   0x0:	push   %ebx
++(gdb) display/i (char*)end
++2: x/i (char*)end
++   0xf01006f6 <cons_init>:	push   %ebp
++(gdb) c
++Continuing.
++=> 0xf0100b27 <boot_alloc>:	push   %ebp
++
++Breakpoint 1, boot_alloc (n=0) at kern/pmap.c:89
++89	{
++1: x/i nextfree
++   0xf0119000:	add    %al,(%eax)
++2: x/i (char*)end
++   0xf01006f6 <cons_init>:	push   %ebp
++(gdb) p nextfree
++$5 = 0xf0119000 ""
++(gdb) p (char*) end
++$6 = 0xf01006f6 <cons_init> "U\211\345\203\354\b\350\266\373\377\377\350\277\372\377\377\200=4u", <incomplete sequence \360>
++(gdb) display/i nextfree
++3: x/i nextfree
++   0xf0119000:	add    %al,(%eax)
++(gdb) display/i (char*)end
++4: x/i (char*)end
++   0xf01006f6 <cons_init>:	push   %ebp
++(gdb) display/i nextfree
++5: x/i nextfree
++   0xf0119000:	add    %al,(%eax) "
+ 
+ page_alloc
+ ----------
+-
+-...
++La función page2kva() utiliza la ya mencionada función page2pa() pero, en vez de devolver la dirección física
++del struct PageInfo recibido, devuelve la dirección virtual a través de la macro KADDR.
+ 
+ 
+diff --git a/__pycache__/gradelib.cpython-36.pyc b/__pycache__/gradelib.cpython-36.pyc
+new file mode 100644
+index 0000000..d5e4ad6
+Binary files /dev/null and b/__pycache__/gradelib.cpython-36.pyc differ
+diff --git a/kern/pmap.c b/kern/pmap.c
+index 88608e7..23953d4 100644
+--- a/kern/pmap.c
++++ b/kern/pmap.c
+@@ -105,8 +105,28 @@ boot_alloc(uint32_t n)
+ 	// to a multiple of PGSIZE.
+ 	//
+ 	// LAB 2: Your code here.
+-
+-	return NULL;
++	// El limite es la cantidad de paginas x su tamaño (memoria fisica)
++	uint32_t top_limit = npages*PGSIZE;
++	// Me guardo el offset actual
++	uint32_t offset = (uint32_t) nextfree;
++	// Obtengo la direccion virtual a la que llegaria con n + offset
++	uint32_t actual_dir = ROUNDUP(n, PGSIZE) + offset;
++	// La transformo a direccion fisica para compararla con top_limit
++	physaddr_t actual_pa = PADDR((char *) actual_dir);
++
++	if (actual_pa > top_limit) {
++		panic("No hay suficiente memoria física\n");
++	}
++	// Si n==0 devuelvo la proxima pagina libre
++	if (n==0) {
++		return nextfree;
++	} else {
++		// Me guardo la posicion actual de nextfree para luego devolverlo
++		result = nextfree;
++		// Avanzo nextfree n bytes y redondeo (alineo) a 4096 bytes
++		nextfree += ROUNDUP(n, PGSIZE);
++		return result;
++	}
+ }
+ 
+ // Set up a two-level page table:
+@@ -128,7 +148,7 @@ mem_init(void)
+ 	i386_detect_memory();
+ 
+ 	// Remove this line when you're ready to test this function.
+-	panic("mem_init: This function is not finished\n");
++	// panic("mem_init: This function is not finished\n");
+ 
+ 	//////////////////////////////////////////////////////////////////////
+ 	// create initial page directory.
+@@ -153,7 +173,8 @@ mem_init(void)
+ 	// memset
+ 	// to initialize all fields of each struct PageInfo to 0.
+ 	// Your code goes here:
+-
++	pages = boot_alloc(npages*sizeof(struct PageInfo));
++	memset(pages, 0, npages*sizeof(struct PageInfo));
+ 
+ 	//////////////////////////////////////////////////////////////////////
+ 	// Now that we've allocated the initial kernel data structures, we set
+@@ -177,6 +198,8 @@ mem_init(void)
+ 	//      (ie. perm = PTE_U | PTE_P)
+ 	//    - pages itself -- kernel RW, user NONE
+ 	// Your code goes here:
++	size_t size = ROUNDUP(npages*sizeof(struct PageInfo), PGSIZE);
++	boot_map_region(kern_pgdir, UPAGES, size, PADDR(pages), PTE_U);
+ 
+ 	//////////////////////////////////////////////////////////////////////
+ 	// Use the physical memory that 'bootstack' refers to as the kernel
+@@ -189,6 +212,7 @@ mem_init(void)
+ 	//       overwrite memory.  Known as a "guard page".
+ 	//     Permissions: kernel RW, user NONE
+ 	// Your code goes here:
++	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
+ 
+ 	//////////////////////////////////////////////////////////////////////
+ 	// Map all of physical memory at KERNBASE.
+@@ -198,6 +222,8 @@ mem_init(void)
+ 	// we just set up the mapping anyway.
+ 	// Permissions: kernel RW, user NONE
+ 	// Your code goes here:
++	boot_map_region(kern_pgdir, KERNBASE, (1ULL << 32) - KERNBASE, 0, PTE_W);
++
+ 
+ 	// Check that the initial page directory has been set up correctly.
+ 	check_kern_pgdir();
+@@ -258,14 +284,32 @@ page_init(void)
+ 	// free pages!
+ 	size_t i;
+ 	for (i = 0; i < npages; i++) {
+-		pages[i].pp_ref = 0;
++		// nextfree page physicall address
++		physaddr_t first_free_page = PADDR((char *) boot_alloc(0));
++		// actual page physicall address
++		physaddr_t page_pa = page2pa(&pages[i]);
++		
++		// Las siguientes condiciones me indican memoria invalida:
++		// - Pagina 0
++		bool first_page = i==0;
++		// - Espacio para I/O (desde IOPHYSMEM hasta EXTPHYSMEM)
++		bool io_space = page_pa >= IOPHYSMEM && page_pa <= EXTPHYSMEM;
++		// - Espacio para el kernel y boot_alloc (desde EXTPHYSMEM hasta nextfree)
++		bool kernel_boot_alloc_space = page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
++		
++		// No las agrego a la lista de paginas libres
++		bool invalid_page = first_page || io_space || kernel_boot_alloc_space;
++		if (invalid_page) {
++			continue;
++		}
++		// Armo la lista enlazada de paginas libres
+ 		pages[i].pp_link = page_free_list;
+ 		page_free_list = &pages[i];
+ 	}
+ }
+ 
+ //
+-// Allocates a physical page.  If (alloc_flags & ALLOC_ZERO), fills the entire
++// Allocates a physical page.  If (alloc_flags == ALLOC_ZERO), fills the entire
+ // returned physical page with '\0' bytes.  Does NOT increment the reference
+ // count of the page - the caller must do these if necessary (either explicitly
+ // or via page_insert).
+@@ -279,8 +323,26 @@ page_init(void)
+ struct PageInfo *
+ page_alloc(int alloc_flags)
+ {
+-	// Fill this function in
+-	return 0;
++	// Saco la pagina libre cabeza de la lista
++	struct PageInfo *free_page = page_free_list;
++	if (!free_page) {
++		return NULL;
++	}
++	// Actualizo la cabeza de la lista de paginas libres
++	page_free_list = free_page->pp_link;
++	// Dereferencio la pagina que saque
++	free_page->pp_link = NULL;
++
++	// Una vez que sacamos la pagina de la lista de paginas libres,
++	// podemos decir que esta alocada en la memoria fisica
++
++	// Ponemos en 0 los 4KB (PGSIZE) de la pagina alocada
++	// Con esto limpiamos basura que haya quedado
++	// En particular algun bit PTE_P en 1
++	if (alloc_flags==ALLOC_ZERO) {
++		memset(page2kva(free_page), '\0', PGSIZE);
++	}
++	return free_page;
+ }
+ 
+ //
+@@ -293,6 +355,22 @@ page_free(struct PageInfo *pp)
+ 	// Fill this function in
+ 	// Hint: You may want to panic if pp->pp_ref is nonzero or
+ 	// pp->pp_link is not NULL.
++
++	// Si la pagina recibida tiene algun link, quiere decir que
++	// esta en la lista de paginas libres
++	if (pp->pp_ref != 0 || pp->pp_link) {
++		panic("La pagina recibida ya se encuentra libre");
++	}
++
++	// Me guardo la anterior cabeza de la lista
++	struct PageInfo *prev_page_free_list = page_free_list;
++	// Actualizo la cabeza de la lista
++	page_free_list = pp;
++	// Referencio la cabeza de la lista
++	pp->pp_link = prev_page_free_list;
++
++	// Una vez que agregamos la pagina a la lista de paginas libres,
++	// podemos decir que no esta alocada en la memoria fisica
+ }
+ 
+ //
+@@ -331,10 +409,46 @@ page_decref(struct PageInfo *pp)
+ pte_t *
+ pgdir_walk(pde_t *pgdir, const void *va, int create)
+ {
+-	// Fill this function in
+-	return NULL;
++	// Page table entry (aca se carga la virtual address de la page table)
++	pte_t *pgtab_addr;
++	
++	// Me guardo el offset en la page directory (primeros 10 bits de va)
++	int pgdir_offset = PDX(va);
++	// Me guardo el offset en la page table (segundos 10 bits de va)
++	int pgtab_offset = PTX(va);
++	
++	// Si no esta el bit de presencia (PTE_P) --> no hay page table asociada a la page directory
++	if (!(pgdir[pgdir_offset] & PTE_P)) {
++		// Si create == 0 --> devuelvo null y no hago nada
++		if (create==0) {
++			return NULL;
++		}
++		// Creo una nueva page table
++		// Le paso ALLOC ZERO para que limpie basura que haya quedado
++		// y no me quede un falso PTE_P en 1
++		struct PageInfo *new_page_table = page_alloc(ALLOC_ZERO);
++		if (!new_page_table) {
++			return NULL;
++		}
++		new_page_table->pp_ref ++;
++		// Cargo en el registro de la page directory la direccion fisica de la nueva page table
++		// Y le asigno el bit de presencia (PTE_P) y los permisos (PTE_U y PTE_W)
++		pgdir[pgdir_offset] = page2pa(new_page_table) | PTE_P | PTE_U | PTE_W;
++		// Convierto la nueva page table a virtual address
++		pgtab_addr = page2kva(new_page_table);
++	} else {
++		// Me guardo la direccion fisica de la page table asociada (primeros 20 bits del registro del page directory)
++		// pgdir[pgdir_offset] es la posicion dentro del page directory --> = pgdir + pgdir_offset
++		physaddr_t pgtable_phys_addr = PTE_ADDR(pgdir[pgdir_offset]);
++		
++		// Convierto la direccion fisica de la page table a virtual address
++		pgtab_addr = KADDR(pgtable_phys_addr);
++	}
++	// Devuelvo la virtual address obtenida + el offset
++	return pgtab_addr + pgtab_offset;
+ }
+ 
++
+ //
+ // Map [va, va+size) of virtual address space to physical [pa, pa+size)
+ // in the page table rooted at pgdir.  Size is a multiple of PGSIZE, and
+@@ -349,7 +463,19 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
+ static void
+ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
+ {
+-	// Fill this function in
++	uintptr_t actual_va;
++	physaddr_t actual_pa;
++	uintptr_t i;
++	// Recorro las direcciones de a PGSIZE bytes
++	for (i=0; i<size; i+=PGSIZE) {
++		// Actualizo las direcciones virtuales y fisicas
++		actual_va = va + i;
++		actual_pa = pa + i;
++		// Obtengo la direccion de la page table entry
++		pte_t *pgtab_addr = pgdir_walk(pgdir, (void *) actual_va, 1);
++		// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
++		*pgtab_addr = actual_pa | perm | PTE_P;
++	}
+ }
+ 
+ //
+@@ -380,10 +506,26 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
+ int
+ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
+ {
+-	// Fill this function in
++	// Obtengo la direccion de la page table entry
++	// Le paso un 1 para que la cree en caso de que no exista
++	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 1);
++	// Si la page table no pudo ser alocada, devuelvo error de memoria
++	if (!pgtab_addr) {
++		return ~E_NO_MEM;
++	}
++	// Aumento el pp_ref antes de removerla por si ya tenia la misma page table entry
++	pp->pp_ref++;
++	// Si ya hay una page (bit de presencia PTE_P), la remuevo
++	if (*pgtab_addr & PTE_P) {
++		page_remove(pgdir, va);
++	}
++	// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
++	*pgtab_addr = page2pa(pp) | perm | PTE_P;
++
+ 	return 0;
+ }
+ 
++
+ //
+ // Return the page mapped at virtual address 'va'.
+ // If pte_store is not zero, then we store in it the address
+@@ -398,8 +540,25 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
+ struct PageInfo *
+ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
+ {
+-	// Fill this function in
+-	return NULL;
++	// Me guardo el offset en la memoria fisica (ultimos 12 bits de va)
++	int phys_offset = PGOFF(va);
++
++	// Obtengo la direccion de la page table entry
++	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 0);
++	if (!pgtab_addr){
++		return NULL;
++	}
++	// Obtengo la direccion fisica a donde apunta el page table entry
++	physaddr_t pgtable_phys_addr = PTE_ADDR(*pgtab_addr);
++	// Le sumo el offset y obtengo la direccion fisica apuntada por el struct PageInfo
++	physaddr_t page_phys_addr = pgtable_phys_addr + phys_offset;
++
++	// Guardo la direccion fisica del page table entry en pte_store
++	if (pte_store != 0){
++		*pte_store = pgtab_addr;
++	}
++	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida 
++	return pa2page(page_phys_addr);
+ }
+ 
+ //
+@@ -420,7 +579,21 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
+ void
+ page_remove(pde_t *pgdir, void *va)
+ {
+-	// Fill this function in
++	// Obtengo la pagina mapeada en va
++	// Me guardo en pgtab_addr el page table entry
++	pte_t *pgtab_addr;
++	struct PageInfo *mapped_page = page_lookup(pgdir, va, &pgtab_addr);
++	if (!mapped_page){
++		return;
++	}
++	// Decremento el pp_ref y libero la pagina si pp_ref llega a cero
++	page_decref(mapped_page);
++
++	// Seteo el page table entry en 0
++	*pgtab_addr = 0;
++
++	// Invalido la TLB
++	tlb_invalidate(pgdir, va);
+ }
+ 
+ //

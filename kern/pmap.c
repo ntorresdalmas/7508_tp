@@ -463,6 +463,33 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
+	#ifdef TP1_PSE
+	// Implementacion para large pages
+	// TO DO: ver donde va este if...
+	// if (pa % PTSIZE == 0) { // Alineada a 4 MB
+		
+		// Como size es un multiplo de PGSIZE, lo llevo a PTSIZE
+		// size *= NPDENTRIES;
+		
+		uintptr_t actual_va;
+		physaddr_t actual_pa;
+		int pgdir_offset;
+		uintptr_t i;
+		
+		// TO DO: ver el i+=???
+		// Ahora cada registro deberia ser de 4 MB...
+		for (i=0; i<size; i+=PGSIZE) {
+			// Actualizo las direcciones virtuales y fisicas
+			actual_va = va + i;
+			actual_pa = pa + i;
+			pgdir_offset = PDX(actual_va);
+			// Referencio el page directory entry con la direccion fisica de la PageInfo + los bits de permiso
+			pgdir[pgdir_offset] = actual_pa | perm | PTE_P | PTE_PS;
+		}
+	// }
+
+	#else
+	// Implementacion original
 	uintptr_t actual_va;
 	physaddr_t actual_pa;
 	uintptr_t i;
@@ -476,7 +503,10 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
 		*pgtab_addr = actual_pa | perm | PTE_P;
 	}
+	#endif
 }
+
+
 
 //
 // Map the physical page 'pp' at virtual address 'va'.

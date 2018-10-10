@@ -113,6 +113,12 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+	size_t i;
+	for (i = 0; i < npages; i++) {
+		// Armo la lista enlazada de paginas libres
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}
 
 	// Per-CPU part of the initialization
 	env_init_percpu();

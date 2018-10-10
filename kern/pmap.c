@@ -477,9 +477,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		pgdir_offset = PDX(actual_va);
 
 		// TO DO: Falta detectar que aun quedan 4MB o mas por mapear
-		// TO DO: No se si es pa o va
 		if (va % PTSIZE == 0) { // Memoria VIRTUAL alineada a 4 MB
-			// Referencio el page directory entry con la direccion fisica de la PageInfo + los bits de permiso y flags
+			// Referencio el page directory entry con la direccion fisica + los bits de permiso y flags
 			pgdir[pgdir_offset] = actual_pa | perm | PTE_P | PTE_PS;
 		} else {
 			// Obtengo la direccion de la page table entry

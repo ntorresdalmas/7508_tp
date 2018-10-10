@@ -463,30 +463,29 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	//ver cual if de los 2 esta bien, ya que el 'if (va % PTSIZE == 0)' no tiene un else.
 	#ifdef TP1_PSE
 	// Implementacion para large pages
-	if (va % PTSIZE == 0) { // Memoria VIRTUAL alineada a 4 MB
-		
-		// Como size es un multiplo de PGSIZE, lo llevo a PTSIZE
-		// size *= NPDENTRIES;
+	uintptr_t actual_va;
+	physaddr_t actual_pa;
+	int pgdir_offset;
+	uintptr_t i;
 
-		uintptr_t actual_va;
-		physaddr_t actual_pa;
-		int pgdir_offset;
-		uintptr_t i;
+	for (i=0; i<size; i+=PGSIZE) {
+		// Actualizo las direcciones virtuales y fisicas
+		actual_va = va + i;
+		actual_pa = pa + i;
+		pgdir_offset = PDX(actual_va);
 
-		// creo que iterar el i<size esta bien ya que dato dijo que con el 'pgdir[pgdir_offset]'
-		// estamos avanzando 4MiB
-		for (i=0; i<size; i+=PGSIZE) {
-		// dentro de este for nos faltaria usar algo que hayamos implementado en pgdir_walk, como el page->pp_ref++
-		// u otras cosas de ese estilo.
-			// Actualizo las direcciones virtuales y fisicas
-			actual_va = va + i;
-			actual_pa = pa + i;
-			pgdir_offset = PDX(actual_va);
+		// TO DO: Falta detectar que aun quedan 4MB o mas por mapear
+		// TO DO: No se si es pa o va
+		if (va % PTSIZE == 0) { // Memoria VIRTUAL alineada a 4 MB
 			// Referencio el page directory entry con la direccion fisica de la PageInfo + los bits de permiso y flags
 			pgdir[pgdir_offset] = actual_pa | perm | PTE_P | PTE_PS;
+		} else {
+			// Obtengo la direccion de la page table entry
+			pte_t *pgtab_addr = pgdir_walk(pgdir, (void *) actual_va, 1);
+			// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
+			*pgtab_addr = actual_pa | perm | PTE_P;
 		}
 	}
 

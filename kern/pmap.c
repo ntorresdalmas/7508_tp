@@ -463,30 +463,32 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
+	//ver cual if de los 2 esta bien, ya que el 'if (va % PTSIZE == 0)' no tiene un else.
 	#ifdef TP1_PSE
 	// Implementacion para large pages
-	// TO DO: ver donde va este if...
-	// if (pa % PTSIZE == 0) { // Alineada a 4 MB
+	if (va % PTSIZE == 0) { // Memoria VIRTUAL alineada a 4 MB
 		
 		// Como size es un multiplo de PGSIZE, lo llevo a PTSIZE
 		// size *= NPDENTRIES;
-		
+
 		uintptr_t actual_va;
 		physaddr_t actual_pa;
 		int pgdir_offset;
 		uintptr_t i;
-		
-		// TO DO: ver el i+=???
-		// Ahora cada registro deberia ser de 4 MB...
+
+		// creo que iterar el i<size esta bien ya que dato dijo que con el 'pgdir[pgdir_offset]'
+		// estamos avanzando 4MiB
 		for (i=0; i<size; i+=PGSIZE) {
+		// dentro de este for nos faltaria usar algo que hayamos implementado en pgdir_walk, como el page->pp_ref++
+		// u otras cosas de ese estilo.
 			// Actualizo las direcciones virtuales y fisicas
 			actual_va = va + i;
 			actual_pa = pa + i;
 			pgdir_offset = PDX(actual_va);
-			// Referencio el page directory entry con la direccion fisica de la PageInfo + los bits de permiso
+			// Referencio el page directory entry con la direccion fisica de la PageInfo + los bits de permiso y flags
 			pgdir[pgdir_offset] = actual_pa | perm | PTE_P | PTE_PS;
 		}
-	// }
+	}
 
 	#else
 	// Implementacion original

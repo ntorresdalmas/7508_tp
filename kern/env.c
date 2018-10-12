@@ -113,6 +113,13 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+	size_t i;
+	for (i = NENV-1; i >= 0; i--) {
+		// Armo la lista enlazada de envs libres
+		envs[i].env_link = env_free_list;
+		envs[i].env_id = 0;
+		env_free_list = &envs[i];
+	}
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -176,6 +183,13 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	// Mapeo la PageInfo con el page directory del proceso
+	e->env_pgdir[PDX(UTOP)] = page2pa(p) | PTE_P | PTE_U;
+	p->pp_ref++;
+	// Utilizo kern_pgdir como template y copio su contenido a la pagina del proceso
+	for (i=PDX(UTOP); i<NPDENTRIES; i++) {
+		memcpy((void *) e->env_pgdir[i], (void *) kern_pgdir[i], PGSIZE);
+	}
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R

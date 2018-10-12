@@ -484,24 +484,26 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	// Implementacion para large pages
 	uintptr_t actual_va;
 	physaddr_t actual_pa;
-	int pgdir_offset;
+	int size_to_map;
+	int aux_size;
 	uintptr_t i;
 
-	for (i=0; i<size; i+=PGSIZE) {
+	for (i=0; i<size; i+=aux_size) {
 		// Actualizo las direcciones virtuales y fisicas
 		actual_va = va + i;
 		actual_pa = pa + i;
-		pgdir_offset = PDX(actual_va);
+		size_to_map = size - i;
 
-		// TO DO: Falta detectar que aun quedan 4MB o mas por mapear
-		if (va % PTSIZE == 0) { // Memoria VIRTUAL alineada a 4 MB
-			// Referencio el page directory entry con la direccion fisica + los bits de permiso y flags
-			pgdir[pgdir_offset] = actual_pa | perm | PTE_P | PTE_PS;
+		// Si va esta alineada a 4 MB y quedan mas de 4 MB por mapear
+		// Mapeo directamente con un large page (avanzo de a PTSIZE)
+		if (actual_va % PTSIZE == 0 && size_to_map >= PTSIZE) {
+			pgdir[PDX(actual_va)] = actual_pa | perm | PTE_P | PTE_PS;
+			aux_size = PTSIZE;
 		} else {
-			// Obtengo la direccion de la page table entry
+		// Si no, aplico la logica original (avanzo de a PGSIZE)
 			pte_t *pgtab_addr = pgdir_walk(pgdir, (void *) actual_va, 1);
-			// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
 			*pgtab_addr = actual_pa | perm | PTE_P;
+			aux_size = PGSIZE;
 		}
 	}
 

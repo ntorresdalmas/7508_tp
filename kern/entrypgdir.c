@@ -18,7 +18,6 @@ pte_t entry_pgtable[NPTENTRIES];
 // here, rather than the more standard "x | PTE_P".  Everywhere else
 // you should use "|" to combine flags.
 
-#ifdef TP1_PSE
 // Implementacion para large pages
 __attribute__((__aligned__(PGSIZE)))
 pde_t entry_pgdir[NPDENTRIES] = {
@@ -30,7 +29,7 @@ pde_t entry_pgdir[NPDENTRIES] = {
 		= 0x000000 + PTE_P + PTE_W + PTE_PS
 };
 
-#else
+/*
 // Implementacion original
 __attribute__((__aligned__(PGSIZE)))
 pde_t entry_pgdir[NPDENTRIES] = {
@@ -1071,4 +1070,4 @@ pte_t entry_pgtable[NPTENTRIES] = {
 	0x3fe000 | PTE_P | PTE_W,
 	0x3ff000 | PTE_P | PTE_W,
 };
-#endif
+*/

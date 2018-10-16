@@ -183,13 +183,15 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-	// Mapeo la PageInfo con el page directory del proceso
-	e->env_pgdir[PDX(UTOP)] = page2pa(p) | PTE_P | PTE_U;
+	// Mapeo el pgdir del proceso con la va del PageInfo
+	e->env_pgdir = (pde_t *) page2kva(p);
 	p->pp_ref++;
 	// Utilizo kern_pgdir como template y copio su contenido a la pagina del proceso
-	for (i=PDX(UTOP); i<NPDENTRIES; i++) {
-		memcpy((void *) e->env_pgdir[i], (void *) kern_pgdir[i], PGSIZE);
-	}
+	memcpy((void *) e->env_pgdir, (void *) kern_pgdir, PGSIZE*NPDENTRIES);
+
+	// UVPT maps the env's own page table read-only.
+	// Permissions: kernel R, user R
+	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R

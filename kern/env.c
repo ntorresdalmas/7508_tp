@@ -115,9 +115,11 @@ env_init(void)
 	// LAB 3: Your code here.
 	size_t i;
 	for (i = NENV-1; i >= 0; i--) {
-		// Armo la lista enlazada de envs libres
-		envs[i].env_link = env_free_list;
+		// Armo la lista enlazada de envs libres de modo tal que
+		// en la primera llamada env_init --> env_free_list = envs[0]
+		envs[i].env_status = ENV_FREE;
 		envs[i].env_id = 0;
+		envs[i].env_link = env_free_list;
 		env_free_list = &envs[i];
 	}
 
@@ -186,7 +188,7 @@ env_setup_vm(struct Env *e)
 	// Mapeo el pgdir del proceso con la va del PageInfo
 	e->env_pgdir = (pde_t *) page2kva(p);
 	p->pp_ref++;
-	// Utilizo kern_pgdir como template y copio su contenido a la pagina del proceso
+	// Utilizo kern_pgdir como template y lo copio al pdgir del proceso
 	memcpy((void *) e->env_pgdir, (void *) kern_pgdir, PGSIZE*NPDENTRIES);
 
 	// UVPT maps the env's own page table read-only.
@@ -280,6 +282,25 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	// Alineo va a PGSIZE (down)
+	size_t va_aligned = ROUNDDOWN((size_t) va, PGSIZE);
+	// Alineo va+len a PGSIZE (up)
+	size_t space_aligned = ROUNDUP((size_t) va+len, PGSIZE);
+
+	// Realizo un ciclo para los len bytes
+	size_t i;
+	for (i=va_aligned; i<=space_aligned; i+=PGSIZE) {
+		// Aloco una pagina fisica
+		struct PageInfo *new_page = page_alloc(0);
+		if (!new_page) {
+			panic("Error al alocar la pagina fisica");
+		}
+		// Mapeo la pagina fisica con la va actual en el pgdir del proceso
+		if (page_insert(e->env_pgdir, new_page, (void *) i, PTE_U) < 0) {
+			panic ("Error al mapear la pagina fisica en la direccion virtual");
+		}
+	}
 }
 
 //
@@ -337,10 +358,46 @@ load_icode(struct Env *e, uint8_t *binary)
 
 	// LAB 3: Your code here.
 
+	// TO DO: no se como definir el ELF
+	struct Elf *elf = (struct Elf *) binary;
+
+	if (elf->e_magic != ELF_MAGIC) {
+		panic("Archivo ELF invalido\n");
+	}
+
+	struct Proghdr *ph, *eph;
+	// Obtengo el program header del binario ELF
+	ph = (struct Proghdr *) ((uint8_t *) elf + elf->e_phoff);
+	// Obtengo el ultimo segmento del binario ELF
+	eph = ph + elf->e_phnum;
+
+	// Cambio el espacio virtual de direcciones (kernel --> proceso)
+	lcr3(PADDR(e->env_pgdir));
+
+	// Recorro todos los segmentos del binario
+	while (ph < eph) {
+		if (ph->p_type == ELF_PROG_LOAD) {
+			// Aloco el size del segmento en memoria fisica y lo mapeo a su va
+			region_alloc(e, (void *) ph->p_va, (size_t) ph->p_memsz);
+			// Copio los bytes del segmento a su va
+			memcpy((void *) ph->p_va, binary + ph->p_offset, (size_t) ph->p_filesz);
+			// Seteo los bytes restantes del segmento en 0
+			memset((void *) (ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+		}
+		ph++;
+	}
+	// Seteo el entry point del proceso
+	e->env_tf.tf_eip = elf->e_entry;
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	// Mapeo una pagina para el stack inicial del programa
+	region_alloc(e, (void *) USTACKTOP - PGSIZE, PGSIZE);
+
+	// Cambio el espacio virtual de direcciones (proceso --> kernel)
+	lcr3(PADDR(kern_pgdir));
 }
 
 //
@@ -354,6 +411,18 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env *new_env;
+	envid_t parent_id = 0;
+	
+	// Aloco un nuevo proceso
+	// TO DO: cambiar el panic por un %e
+	if (env_alloc(&new_env, parent_id) < 0) {
+		panic("No hay procesos por alocar");
+	}
+	// Cargo el binario ELF en el proceso
+	load_icode(new_env, binary);
+	// Seteo el tipo del proceso
+	new_env->env_type = type;
 }
 
 //

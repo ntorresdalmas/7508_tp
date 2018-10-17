@@ -114,15 +114,15 @@ env_init(void)
 	// Set up envs array
 	// LAB 3: Your code here.
 	size_t i;
+	// TO DO: algo esta fallando en este for, tira error de memoria
 	for (i = NENV-1; i >= 0; i--) {
 		// Armo la lista enlazada de envs libres de modo tal que
-		// en la primera llamada env_init --> env_free_list = envs[0]
+		// en la primera llamada a env_init --> env_free_list = envs[0]
 		envs[i].env_status = ENV_FREE;
 		envs[i].env_id = 0;
 		envs[i].env_link = env_free_list;
 		env_free_list = &envs[i];
 	}
-
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -189,7 +189,7 @@ env_setup_vm(struct Env *e)
 	e->env_pgdir = (pde_t *) page2kva(p);
 	p->pp_ref++;
 	// Utilizo kern_pgdir como template y lo copio al pdgir del proceso
-	memcpy((void *) e->env_pgdir, (void *) kern_pgdir, PGSIZE*NPDENTRIES);
+	memcpy((void *) e->env_pgdir, (void *) kern_pgdir, PGSIZE);
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -290,7 +290,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 
 	// Realizo un ciclo para los len bytes
 	size_t i;
-	for (i=va_aligned; i<=space_aligned; i+=PGSIZE) {
+	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
 		// Aloco una pagina fisica
 		struct PageInfo *new_page = page_alloc(0);
 		if (!new_page) {
@@ -415,9 +415,9 @@ env_create(uint8_t *binary, enum EnvType type)
 	envid_t parent_id = 0;
 	
 	// Aloco un nuevo proceso
-	// TO DO: cambiar el panic por un %e
-	if (env_alloc(&new_env, parent_id) < 0) {
-		panic("No hay procesos por alocar");
+	int err = env_alloc(&new_env, parent_id);
+	if (err < 0) {
+		panic("env_create: %e", err);
 	}
 	// Cargo el binario ELF en el proceso
 	load_icode(new_env, binary);
@@ -539,6 +539,20 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
+	// panic("env_run not yet implemented");
 
-	panic("env_run not yet implemented");
+	// Si ya hay un proceso en ejecucion lo saco
+	if (curenv && curenv->env_status == ENV_RUNNING) {
+		curenv->env_status = ENV_RUNNABLE;
+	}
+	// Seteo el nuevo proceso en ejecucion
+	curenv = e;
+	e->env_status = ENV_RUNNING;
+	e->env_runs ++;
+
+	// Cambio el espacio virtual de direcciones (kernel --> proceso)
+	lcr3(PADDR(e->env_pgdir));
+
+	// Restauro los registros del proceso
+	env_pop_tf(&e->env_tf);
 }

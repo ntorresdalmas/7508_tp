@@ -57,6 +57,30 @@ trapname(int trapno)
 	return "(unknown trap)";
 }
 
+// Defino todos los prototipos de los handlers
+void trap_0(void);
+void trap_1(void);
+void trap_2(void);
+void trap_3(void);
+void trap_4(void);
+void trap_5(void);
+void trap_6(void);
+void trap_7(void);
+void trap_8(void);
+// Excepcion 9 esta reservada
+void trap_10(void);
+void trap_11(void);
+void trap_12(void);
+void trap_13(void);
+void trap_14(void);
+// Excepcion 15 esta reservada por Intel
+void trap_16(void);
+void trap_17(void);
+void trap_18(void);
+void trap_19(void);
+void trap_20(void);
+// Excepciones 21 a 31 estan reservadas por Intel
+// Excepciones 32 a 255 estan libres para el usuario
 
 void
 trap_init(void)
@@ -64,32 +88,36 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
-	/*
-	// TO DO: no entiendo que hay que hacer con la GDT
+	// Parametros de SETGATE:
+	//		gate = idt[i]
+	//		istrap = 0 (no se permiten anidar interrupciones)
+	//		gd_sel = GD_KT (Global Descriptor Kernel Text)
+	//		off = nombre del la funcion del traphandler
+	//		dpl = 0 para kernel, 3 para user (solo breakpoint y syscalls son user)
+	SETGATE(idt[0], 0, GD_KT, trap_0, 0);
+	SETGATE(idt[1], 0, GD_KT, trap_1, 0);
+	SETGATE(idt[2], 0, GD_KT, trap_2, 0);
+	SETGATE(idt[3], 0, GD_KT, trap_3, 3);
+	SETGATE(idt[4], 0, GD_KT, trap_4, 0);
+	SETGATE(idt[5], 0, GD_KT, trap_5, 0);
+	SETGATE(idt[6], 0, GD_KT, trap_6, 0);
+	SETGATE(idt[7], 0, GD_KT, trap_7, 0);
+	SETGATE(idt[8], 0, GD_KT, trap_8, 0);
+	// Excepcion 9 esta reservada
+	SETGATE(idt[10], 0, GD_KT, trap_10, 0);
+	SETGATE(idt[11], 0, GD_KT, trap_11, 0);
+	SETGATE(idt[12], 0, GD_KT, trap_12, 0);
+	SETGATE(idt[13], 0, GD_KT, trap_13, 0);
+	SETGATE(idt[14], 0, GD_KT, trap_14, 0);
+	// Excepcion 15 esta reservada por Intel
+	SETGATE(idt[16], 0, GD_KT, trap_16, 0);
+	SETGATE(idt[17], 0, GD_KT, trap_17, 0);
+	SETGATE(idt[18], 0, GD_KT, trap_18, 0);
+	SETGATE(idt[19], 0, GD_KT, trap_19, 0);
+	SETGATE(idt[20], 0, GD_KT, trap_20, 0);
+	// Excepciones 21 a 31 estan reservadas por Intel
+	// Excepciones 32 a 255 estan libres para el usuario
 
-	// TO DO: 	averiguar si los fault y abort son 0 o 1
-	//			ver que se le pasa a las intel reserved (?)
-	int istrap[31] = {1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,?,1,1,1,1,1,?,?,?,?,?,?,?,?,?,?,?};
-	// TO DO: ver de donde sacar estos dos
-	// trapframe->tf_cs
-	unsigned sel[31] = {};
-	// ???
-	uint32_t off[31] = {};
-	// TO DO: creo que el dpl es 0 de 0 a 31 y 3 de 32 a 255
-	int dpl[31] = {};
-	
-	// Cargo todos los gates de la IDT
-	size_t i;
-	for (i=0; i<256; i++) {
-		if (i<32) {
-			// Los primeros 32 gates los cargo con la info de cada interrupcion
-			SETGATE(idt[i], istrap[i], sel[i], off[i], dpl[i]);
-		} else {
-			// El resto solamente les pongo el bit de presencia en 0
-			idt[i].gd_p = 0;
-		}
-	}
-	*/
 	// Per-CPU setup
 	trap_init_percpu();
 }
@@ -167,6 +195,13 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	if (tf->tf_trapno == T_BRKPT) {
+		monitor(tf);
+	}
+
+	if (tf->tf_trapno == T_PGFLT) {
+		page_fault_handler(tf);
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);

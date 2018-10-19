@@ -113,15 +113,15 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-	size_t i;
+	int i;
 	// TO DO: algo esta fallando en este for, tira error de memoria
-	for (i = NENV-1; i >= 0; i--) {
+	for (i = NENV; i > 0; i--) {
 		// Armo la lista enlazada de envs libres de modo tal que
 		// en la primera llamada a env_init --> env_free_list = envs[0]
-		envs[i].env_status = ENV_FREE;
-		envs[i].env_id = 0;
-		envs[i].env_link = env_free_list;
-		env_free_list = &envs[i];
+		envs[i-1].env_status = ENV_FREE;
+		envs[i-1].env_id = 0;
+		envs[i-1].env_link = env_free_list;
+		env_free_list = &envs[i-1];
 	}
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -297,7 +297,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 			panic("Error al alocar la pagina fisica");
 		}
 		// Mapeo la pagina fisica con la va actual en el pgdir del proceso
-		if (page_insert(e->env_pgdir, new_page, (void *) i, PTE_U) < 0) {
+		if (page_insert(e->env_pgdir, new_page, (void *) i, PTE_U | PTE_W) < 0) {
 			panic ("Error al mapear la pagina fisica en la direccion virtual");
 		}
 	}

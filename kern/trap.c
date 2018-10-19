@@ -64,7 +64,32 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	/*
+	// TO DO: no entiendo que hay que hacer con la GDT
 
+	// TO DO: 	averiguar si los fault y abort son 0 o 1
+	//			ver que se le pasa a las intel reserved (?)
+	int istrap[31] = {1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,?,1,1,1,1,1,?,?,?,?,?,?,?,?,?,?,?};
+	// TO DO: ver de donde sacar estos dos
+	// trapframe->tf_cs
+	unsigned sel[31] = {};
+	// ???
+	uint32_t off[31] = {};
+	// TO DO: creo que el dpl es 0 de 0 a 31 y 3 de 32 a 255
+	int dpl[31] = {};
+	
+	// Cargo todos los gates de la IDT
+	size_t i;
+	for (i=0; i<256; i++) {
+		if (i<32) {
+			// Los primeros 32 gates los cargo con la info de cada interrupcion
+			SETGATE(idt[i], istrap[i], sel[i], off[i], dpl[i]);
+		} else {
+			// El resto solamente les pongo el bit de presencia en 0
+			idt[i].gd_p = 0;
+		}
+	}
+	*/
 	// Per-CPU setup
 	trap_init_percpu();
 }

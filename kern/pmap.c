@@ -682,6 +682,17 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
 
+	// TO DO: Chequeo e->env_pgdir con un for???
+
+	// Si (1) va < ULIM && (2) page_table perm OK
+	/*
+	if (...) {
+		return 0;
+	} else {
+		user_mem_check_addr = first_wrong_va;
+		return -E_FAULT;
+	}
+	*/
 	return 0;
 }
 

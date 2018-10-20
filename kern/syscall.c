@@ -21,6 +21,8 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
+	// TO DO: ver si esta bien pasarle el permiso PTE_W
+	user_mem_assert(curenv, (const void *) s, len, PTE_W);
 
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
@@ -70,10 +72,22 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
+	// panic("syscall not implemented");
 
+	// Los cases son segun la convencion definida en inc\syscall.h
+	// TO DO: 	ver que parametros se le pasa a cada syscall
+	// TO DO: 	Segun la pag del MIT el valor de retorno de cada syscall
+	//			debe cargarse en %eax (syscallno)... ver que onda esto
 	switch (syscallno) {
-	default:
-		return -E_INVAL;
+		case 0:
+			sys_cputs((const char *) a1, (size_t) a2);
+		case 1:
+			return sys_cgetc();
+		case 2:
+			return sys_getenvid();
+		case 3:
+			return sys_env_destroy((envid_t) a1);
+		default:
+			return -E_INVAL;
 	}
 }

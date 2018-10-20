@@ -81,6 +81,8 @@ void trap_19(void);
 void trap_20(void);
 // Excepciones 21 a 31 estan reservadas por Intel
 // Excepciones 32 a 255 estan libres para el usuario
+void trap_48(void);
+
 
 void
 trap_init(void)
@@ -117,6 +119,7 @@ trap_init(void)
 	SETGATE(idt[20], 0, GD_KT, trap_20, 0);
 	// Excepciones 21 a 31 estan reservadas por Intel
 	// Excepciones 32 a 255 estan libres para el usuario
+	SETGATE(idt[48], 0, GD_KT, trap_48, 3);
 
 	// Per-CPU setup
 	trap_init_percpu();
@@ -203,6 +206,16 @@ trap_dispatch(struct Trapframe *tf)
 		page_fault_handler(tf);
 	}
 
+	// Le paso los parametros segun la convencion definida en lib\syscall.c
+	if(tf->tf_trapno == T_SYSCALL) {
+		syscall(tf->tf_regs.reg_eax,\
+				tf->tf_regs.reg_edx,\
+				tf->tf_regs.reg_ecx,\
+				tf->tf_regs.reg_ebx,\
+				tf->tf_regs.reg_edi,\
+				tf->tf_regs.reg_esi);
+	}
+
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -263,6 +276,10 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	// Panic si el page fault ocurre en modo kernel
+	if ((tf->tf_cs & 3) == 0) {
+		panic("Page Fault ocurrio en modo kernel");
+	}
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.

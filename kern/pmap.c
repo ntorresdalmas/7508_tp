@@ -682,17 +682,31 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
 
-	// TO DO: Chequeo e->env_pgdir con un for???
+	// Alineo va a PGSIZE (down)
+	size_t va_aligned = ROUNDDOWN((size_t) va, PGSIZE);
+	// Alineo va+len a PGSIZE (up)
+	size_t space_aligned = ROUNDUP((size_t) va+len, PGSIZE);
 
-	// Si (1) va < ULIM && (2) page_table perm OK
-	/*
-	if (...) {
-		return 0;
-	} else {
-		user_mem_check_addr = first_wrong_va;
-		return -E_FAULT;
+	// TO DO: falla un caso borde para buggyhello
+	// Realizo un ciclo para los len bytes
+	size_t i;
+	for (i=va_aligned; i<=space_aligned; i+=PGSIZE) {
+		// Obtengo la pagina actual del pgdir del proceso
+		pte_t *actual_page = pgdir_walk(env->env_pgdir, (const void *) va_aligned, 0);
+		
+		// Las siguientes condiciones me indican acceso a memoria valida:
+		// (1) va < ULIM
+		bool ulim_va = i < ULIM;
+		// (2) permisos aceptados por la page table
+		bool perm_ok = *actual_page & perm & PTE_P;
+		
+		// Si la va no es accesible, me guardo la primera va erronea y devuelvo
+		bool allowed_va = ulim_va && perm_ok;
+		if (!allowed_va) {
+			user_mem_check_addr = i;
+			return -E_FAULT;
+		}
 	}
-	*/
 	return 0;
 }
 

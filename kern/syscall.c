@@ -75,9 +75,6 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// panic("syscall not implemented");
 
 	// Los cases son segun la convencion definida en inc\syscall.h
-	// TO DO: 	ver que parametros se le pasa a cada syscall
-	// TO DO: 	Segun la pag del MIT el valor de retorno de cada syscall
-	//			debe cargarse en %eax (syscallno)... ver que onda esto
 	switch (syscallno) {
 		case 0:
 			sys_cputs((const char *) a1, (size_t) a2);

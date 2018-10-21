@@ -206,14 +206,16 @@ trap_dispatch(struct Trapframe *tf)
 		page_fault_handler(tf);
 	}
 
-	// Le paso los parametros segun la convencion definida en lib\syscall.c
 	if(tf->tf_trapno == T_SYSCALL) {
-		syscall(tf->tf_regs.reg_eax,\
-				tf->tf_regs.reg_edx,\
-				tf->tf_regs.reg_ecx,\
-				tf->tf_regs.reg_ebx,\
-				tf->tf_regs.reg_edi,\
-				tf->tf_regs.reg_esi);
+		// Le paso los parametros segun la convencion definida en lib\syscall.c
+		int ret_value = syscall(tf->tf_regs.reg_eax,\
+						tf->tf_regs.reg_edx,\
+						tf->tf_regs.reg_ecx,\
+						tf->tf_regs.reg_ebx,\
+						tf->tf_regs.reg_edi,\
+						tf->tf_regs.reg_esi);
+		// Me guardo el valor de retorno de la syscall en %eax
+		tf->tf_regs.reg_eax = ret_value;
 	}
 
 	// Unexpected trap: The user process or the kernel has a bug.

@@ -703,7 +703,10 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 		// Si la va no es accesible, me guardo la primera va erronea y devuelvo
 		bool allowed_va = ulim_va && perm_ok;
 		if (!allowed_va) {
-			user_mem_check_addr = i;
+			// Si la va recibida es menor a PGSIZE, me guardo va pp dicha
+			// ya que ROUNDDOWN me devuelve un valor incorrecto
+			bool va_lower_than_pgsize = (size_t) va < PGSIZE;
+			user_mem_check_addr = va_lower_than_pgsize ? (size_t) va : i;
 			return -E_FAULT;
 		}
 	}

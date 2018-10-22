@@ -687,7 +687,6 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	// Alineo va+len a PGSIZE (up)
 	size_t space_aligned = ROUNDUP((size_t) va+len, PGSIZE);
 
-	// TO DO: falla un caso borde para buggyhello
 	// Realizo un ciclo para los len bytes
 	size_t i;
 	for (i=va_aligned; i<=space_aligned; i+=PGSIZE) {

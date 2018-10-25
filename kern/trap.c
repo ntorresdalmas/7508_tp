@@ -200,22 +200,24 @@ trap_dispatch(struct Trapframe *tf)
 	// LAB 3: Your code here.
 	if (tf->tf_trapno == T_BRKPT) {
 		monitor(tf);
+		return;
 	}
 
 	if (tf->tf_trapno == T_PGFLT) {
 		page_fault_handler(tf);
+		return;
 	}
 
 	if(tf->tf_trapno == T_SYSCALL) {
 		// Le paso los parametros segun la convencion definida en lib\syscall.c
-		int ret_value = syscall(tf->tf_regs.reg_eax,\
-								tf->tf_regs.reg_edx,\
-								tf->tf_regs.reg_ecx,\
-								tf->tf_regs.reg_ebx,\
-								tf->tf_regs.reg_edi,\
-								tf->tf_regs.reg_esi);
 		// Me guardo el valor de retorno de la syscall en %eax
-		tf->tf_regs.reg_eax = ret_value;
+		tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax,
+								tf->tf_regs.reg_edx,
+								tf->tf_regs.reg_ecx,
+								tf->tf_regs.reg_ebx,
+								tf->tf_regs.reg_edi,
+								tf->tf_regs.reg_esi);
+		return;
 	}
 
 	// Unexpected trap: The user process or the kernel has a bug.

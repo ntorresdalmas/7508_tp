@@ -21,7 +21,6 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
-	// TO DO: ver si esta bien pasarle el permiso PTE_W
 	user_mem_assert(curenv, (const void *) s, len, PTE_W);
 
 	// Print the string supplied by the user.
@@ -76,13 +75,13 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	// Los cases son segun la convencion definida en inc\syscall.h
 	switch (syscallno) {
-		case 0:
+		case SYS_cputs:
 			sys_cputs((const char *) a1, (size_t) a2);
-		case 1:
+		case SYS_cgetc:
 			return sys_cgetc();
-		case 2:
+		case SYS_getenvid:
 			return sys_getenvid();
-		case 3:
+		case SYS_env_destroy:
 			return sys_env_destroy((envid_t) a1);
 		default:
 			return -E_INVAL;

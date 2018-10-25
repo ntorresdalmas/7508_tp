@@ -56,7 +56,7 @@ En caso de estar en 3, se trata del ring 3 (user mode).
 
 gdb_hello
 ---------
-...
+#TO DO
 
 
 
@@ -64,7 +64,7 @@ kern_idt
 ---------
 1. ¿Cómo decidir si usar TRAPHANDLER o TRAPHANDLER_NOEC? ¿Qué pasaría si se usara solamente la primera?
 TRAPHANDLER debe utilizarse para aquellas interrupciones/ excepciones que el CPU devuelve un código de error.
-En cambio, TRAPHABLDER_NOEC debe utilizarse para aquellas que el CPU no devuelve un código de error, sino un 0.
+En cambio, TRAPHANDLER_NOEC para aquellas que el CPU no devuelve un código de error, sino un 0.
 
 Si se utilizara solamente TRAPHANDLER, el trap frame perdería el formato en aquellos handlers que el CPU
 no pushea el código de error. Es decir, el 0 que pushea TRAPHANDLER_NOEC para suplantar el código de error
@@ -82,13 +82,18 @@ Si se quiere poder pausar el manejo de una interrupción para atender otra, debe
 
 3. Leer user/softint.c y ejecutarlo con make run-softint-nox. ¿Qué excepción se genera?
    Si hay diferencias con la que invoca el programa... ¿por qué mecanismo ocurre eso, y por qué razones?
-
+Lo que ocurre en 'softint.c' es que se invoca a una interrupción con un nivel de privilegio (DPL) que no corresponde.
+En particular, se está llamado a la interrupción 14 (Page Fault) con un DPL=3 (User Mode).
+Pero, como SETGATE la definió con un DPL=0 (Kernel Mode), se genera la excepción 'General Protection',
+la cual actúa justamente para prevenir que se hagan llamadas con niveles de privilegio incorrectos.
 
 
 user_evil_hello
 ---------------
 1. ¿En qué se diferencia el código de la versión en evilhello.c mostrada arriba?
+Por un lado, 'evilhello.c' le pasa a la syscall un puntero a char.
+Por el otro, 'user_evil_hello.c' le pasa a la syscall la dirección de memoria en la cual se encuentra el puntero a char.
 
 
 2. ¿En qué cambia el comportamiento durante la ejecución? ¿Por qué? ¿Cuál es el mecanismo?
-
+#TO DO

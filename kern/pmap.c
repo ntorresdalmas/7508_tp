@@ -689,15 +689,15 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 
 	// Realizo un ciclo para los len bytes
 	size_t i;
-	for (i=va_aligned; i<=space_aligned; i+=PGSIZE) {
+	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
 		// Obtengo la pagina actual del pgdir del proceso
-		pte_t *actual_page = pgdir_walk(env->env_pgdir, (const void *) va_aligned, 0);
+		pte_t *actual_page = pgdir_walk(env->env_pgdir, (const void *) i, 0);
 		
 		// Las siguientes condiciones me indican acceso a memoria valida:
 		// (1) va < ULIM
 		bool ulim_va = i < ULIM;
 		// (2) permisos aceptados por la page table
-		bool perm_ok = *actual_page & perm & PTE_P;
+		bool perm_ok = (*actual_page & perm) == perm;
 		
 		// Si la va no es accesible, me guardo la primera va erronea y devuelvo
 		bool allowed_va = ulim_va && perm_ok;

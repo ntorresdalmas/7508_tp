@@ -4,24 +4,35 @@ TP2: Procesos de usuario
 env_alloc
 ---------
 1. ¿Qué identificadores se asignan a los primeros 5 procesos creados? (Usar base hexadecimal.)
-codigo: 
-" generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
+Código: 
+	generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
 	if (generation <= 0)  // Don't create a negative env_id.
 		generation = 1 << ENVGENSHIFT;
-	e->env_id = generation | (e - envs); "
+	e->env_id = generation | (e - envs);
 
-Generation queda [0x00001000], eso si el generation de la linea 1 dio <=0.
-Finalmente en la 4ta linea | (or, pone 1 en las posiciones donde e-envs sean 1)
-(e-envs) que es una aritmetica de punteros que da la distancia entre esos 2 lugares de memoria, es decir, la distancia entre
-e(el env actual) y el arreglo de envs, osea la posicion de e en ese envs.
-entonces el env_id del primer proceso qeuda [0x1000], el segundo en [0x1001], el tercero en [0x1002], el cuarto en [0x1003] 
-y el quinto en [0x1004]
+Si generation de la línea 1 es <= 0, con la siguiente línea se obtiene generation = [0x00001000]
+Luego, en la última línea la instrucción "|" (or) pone 1 en las posiciones donde e-envs sea 1.
+Cabe destacar que e-envs es una aritmetica de punteros que devuelve la distancia entre esos 2 lugares de memoria.
+Es decir, la distancia entre e (el env actual) y el arreglo de envs, lo que equivale a la posición de e en envs.
+
+Así, obtenemos los siguientes 'env_id' para los primeros 5 procesos:
+[0x1000]
+[0x1001]
+[0x1002]
+[0x1003] 
+[0x1004]
 
 2. Supongamos que al arrancar el kernel se lanzan NENV proceso a ejecución. A continuación se destruye
    el proceso asociado a envs[630] y se lanza un proceso que cada segundo muere y se vuelve a lanzar.
    ¿Qué identificadores tendrá este proceso en sus sus primeras cinco ejecuciones?
-Siguiendo la logica de la pregunta 1, el primero quedaria en [0x1276], el segundo en [0x1277], el tercero en [0x1278],
-el cuarto en [0x1279] y el quinto en [0x127A]. ya que (e - envs) da 630 [0x276]
+Siguiendo la lógica del punto 1, obtendríamos los siguientes 'env_id' para las primeras 5 ejecuciones:
+[0x1276]
+[0x1277]
+[0x1278]
+[0x1279]
+[0x127A]
+
+Esto es así ya que e-envs = 630 [0x276]
 
 
 env_init_percpu
@@ -40,7 +51,8 @@ env_pop_tf
 Tras el primer 'movl', el stack pointer (%esp) queda en 0.
 
 2. ¿Qué hay en (%esp) justo antes de la instrucción iret? ¿Y en 8(%esp)?
-En $esp se encuentra el $eip. En 8($esp) se encuentra el trapno.
+En $esp se encuentra el $eip.
+En 8($esp) se encuentra el trapno.
 
 3. ¿Cómo puede determinar la CPU si hay un cambio de ring (nivel de privilegio)?
 La CPU conoce el nivel de privilegio gracias al Descriptor Privilege Level (DPL).
@@ -50,7 +62,6 @@ En caso de estar en 3, se trata del ring 3 (user mode).
 
 gdb_hello
 ---------
-
 1.
 $ make gdb
 gdb -q -s obj/kern/kernel -ex 'target remote 127.0.0.1:26000' -n -x .gdbinit
@@ -68,6 +79,7 @@ The target architecture is assumed to be i386
 
 Breakpoint 1, env_pop_tf (tf=0xf01c0000) at kern/env.c:502
 502	{
+
 
 2. 
 $ make run-hello-nox-gdb
@@ -93,9 +105,11 @@ EIP=f0102e92 EFL=00000092 [--S-A--] CPL=0 II=0 A20=1 SMM=0 HLT=0
 ES =0010 00000000 ffffffff 00cf9300 DPL=0 DS   [-WA]
 CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
 
+
 3.
 (gdb) p tf
 $1 = (struct Trapframe *) 0xf01c0000
+
 
 4.
 (gdb) p sizeof(struct Trapframe) / sizeof(int)
@@ -109,6 +123,7 @@ $4 = 17
 
 
 5.
+(gdb) si 4
 (gdb) disas
 Dump of assembler code for function env_pop_tf:
    0xf0102f0e <+0>:	push   %ebp
@@ -126,7 +141,6 @@ Dump of assembler code for function env_pop_tf:
    0xf0102f2d <+31>:	call   0xf01000a9 <_panic>
 End of assembler dump.
 
-"o usar (gdb) si 4" (M=4)""
 
 6.
 (gdb) x/17x $sp
@@ -136,9 +150,12 @@ End of assembler dump.
 0xf01c1030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
 0xf01c1040:	0x00000023
 
+
 7.
-Afirmamos el funcionamiento de env_pop_tf viendo que restaura a cero todos los registros que se usaron en el proceso.
-vemos que los primeros 8 estan en cero ya que son los registros que se 'usan' en el trapframe.
+Los primeros 8 valores están en 0 ya que env_pop_tf se encarga de restaurarlos. 
+Se corresponden con los registros contenidos en PushRegs (eax, ecx, edx, ebx, oesp, ebp, esi, edi).
+Los valores restantes se corresponden con los atributos del struct Trapframe definido en inc/trap.h
+
 
 8. 
 (qemu) info registers
@@ -148,8 +165,10 @@ EIP=f0102ea1 EFL=00000096 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
 ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
 CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
 
-Vemos que todos los registros que usa Trapframe se setean en cero, luego claramente cambia el esp, eip, ya que tienen que ver
-con el flujo de la ejecucion, el que direccion de memoria saltar(eip) y el estado del stack(esp)
+Vemos que todos los registros que usa Trapframe se setean en 0.
+A su vez cambia el esp y eip, ya que tienen que ver con el flujo de la ejecución.
+En particular, nos indican a qué dirección de memoria dirigirse (eip) y el estado del stack (esp)
+
 
 9.
 (gdb) si
@@ -175,14 +194,18 @@ EIP=00800020 EFL=00000002 [-------] CPL=3 II=0 A20=1 SMM=0 HLT=0
 ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
 CS =001b 00000000 ffffffff 00cffa00 DPL=3 CS32 [-R-]
 
-Vemos que tampoco se notan muchos cambios, los 'obvios' mencionados en el punto anterior y ahora tambien el code segment.
+Podemos notar que los registros iniciales se mantienen en 0, a excepción de esp que lógicamente se modifica.
+Luego, notamos que CS (Code Segment) también se modificó. Esto es así porque ya se realizó el context switch.
+
 
 10.
 (gdb) tbreak syscall
 Temporary breakpoint 2 at 0xf01033a6: file {standard input}, line 73.
 
-TO DO: 
-despues de la ejecucion de la instruccion int 0x30 (48, numero elegido para T_SYSCALL) ...
+Lo que ocurre aquí es que se intenta llamar a un trapno (48) que aún no fue definido.
+Por ello, siguiendo el código de trap_dispatch, la ejecución continúa e imprime por pantalla
+el trapframe con el que se ingresó y tira un panic, ya que hay un trap en el kernel
+que no tiene handler asignado.
 
 
 
@@ -214,6 +237,7 @@ Pero, como SETGATE la definió con un DPL=0 (Kernel Mode), se genera la excepci�
 la cual actúa justamente para prevenir que se hagan llamadas con niveles de privilegio incorrectos.
 
 
+
 user_evil_hello
 ---------------
 1. ¿En qué se diferencia el código de la versión en evilhello.c mostrada arriba?
@@ -222,4 +246,4 @@ Por el otro, 'user_evil_hello.c' le pasa a la syscall la dirección de memoria e
 
 
 2. ¿En qué cambia el comportamiento durante la ejecución? ¿Por qué? ¿Cuál es el mecanismo?
-No cambia el comportamiento, ya que la salida es la misma, 
+El comportamiento durante la ejecución no se ve modificado, la salida es exactamente la misma.

@@ -15,7 +15,7 @@ Finalmente en la 4ta linea | (or, pone 1 en las posiciones donde e-envs sean 1)
 (e-envs) que es una aritmetica de punteros que da la distancia entre esos 2 lugares de memoria, es decir, la distancia entre
 e(el env actual) y el arreglo de envs, osea la posicion de e en ese envs.
 entonces el env_id del primer proceso qeuda [0x1000], el segundo en [0x1001], el tercero en [0x1002], el cuarto en [0x1003] 
-y el quinto en [0x1003]
+y el quinto en [0x1004]
 
 2. Supongamos que al arrancar el kernel se lanzan NENV proceso a ejecución. A continuación se destruye
    el proceso asociado a envs[630] y se lanza un proceso que cada segundo muere y se vuelve a lanzar.
@@ -31,27 +31,16 @@ La función 'ldgt' escribe sizeof(gdt) = 48 bits = 6 bytes.
 Los escribe en la dirección de memoria donde se encuentra Global Descriptor Table.
 
 2. ¿Qué representan esos bytes?
-Esos bytes representan la Base Address, el Segmen Registers y la GDT Entry.
+Esos bytes representan la Base Address, el Segment Registers y la GDT Entry.
 
 
 env_pop_tf
 ----------
 1. ¿Qué hay en (%esp) tras el primer movl de la función?
-# TO DO
 Tras el primer 'movl', el stack pointer (%esp) queda en 0.
-debugeando: tras el primer movl, en %esp tengo:
-												"(gdb) p $esp
-												$2 = (void *) 0xf01c1000"
-
 
 2. ¿Qué hay en (%esp) justo antes de la instrucción iret? ¿Y en 8(%esp)?
-# TO DO
-Justo antes de la instrucción 'iret', el stack pointer (%esp) apunta a 0x8.
-y en 8($esp) ni idea
-debugeando: antes del iret, en %esp tengo:
-											"(gdb) p $sp
-												$3 = (void *) 0xf01c1028"
-
+En $esp se encuentra el $eip. En 8($esp) se encuentra el trapno.
 
 3. ¿Cómo puede determinar la CPU si hay un cambio de ring (nivel de privilegio)?
 La CPU conoce el nivel de privilegio gracias al Descriptor Privilege Level (DPL).
@@ -112,41 +101,44 @@ $1 = (struct Trapframe *) 0xf01c0000
 (gdb) p sizeof(struct Trapframe) / sizeof(int)
 $4 = 17
 (gdb) x/17x tf
-0xf01c0000:	0x00000000	0x00000000	0x00000000	0x00000000
-0xf01c0010:	0x00000000	0x00000000	0x00000000	0x00000000
-0xf01c0020:	0x00000023	0x00000023	0x00000000	0x00000000
-0xf01c0030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
-0xf01c0040:	0x00000023
+0xf01c1000:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c1010:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c1020:	0x00000023	0x00000023	0x00000000	0x00000000
+0xf01c1030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
+0xf01c1040:	0x00000023
+
 
 5.
 (gdb) disas
 Dump of assembler code for function env_pop_tf:
-   0xf0102e92 <+0>:	push   %ebp
-   0xf0102e93 <+1>:	mov    %esp,%ebp
-   0xf0102e95 <+3>:	sub    $0xc,%esp
-=> 0xf0102e98 <+6>:	mov    0x8(%ebp),%esp
-   0xf0102e9b <+9>:	popa   
-   0xf0102e9c <+10>:	pop    %es
-   0xf0102e9d <+11>:	pop    %ds
-   0xf0102e9e <+12>:	add    $0x8,%esp
-   0xf0102ea1 <+15>:	iret   
-   0xf0102ea2 <+16>:	push   $0xf0105375
-   0xf0102ea7 <+21>:	push   $0x200
-   0xf0102eac <+26>:	push   $0xf010531a
-   0xf0102eb1 <+31>:	call   0xf01000a9 <_panic>
+   0xf0102f0e <+0>:	push   %ebp
+   0xf0102f0f <+1>:	mov    %esp,%ebp
+   0xf0102f11 <+3>:	sub    $0xc,%esp
+   0xf0102f14 <+6>:	mov    0x8(%ebp),%esp
+=> 0xf0102f17 <+9>:	popa   
+   0xf0102f18 <+10>:	pop    %es
+   0xf0102f19 <+11>:	pop    %ds
+   0xf0102f1a <+12>:	add    $0x8,%esp
+   0xf0102f1d <+15>:	iret   
+   0xf0102f1e <+16>:	push   $0xf0105915
+   0xf0102f23 <+21>:	push   $0x1ff
+   0xf0102f28 <+26>:	push   $0xf01058ba
+   0xf0102f2d <+31>:	call   0xf01000a9 <_panic>
 End of assembler dump.
-"o usar (gdb) si 3" (M=3)""
+
+"o usar (gdb) si 4" (M=4)""
 
 6.
 (gdb) x/17x $sp
-0xf0118fac:	0x00010094	0x00010094	0x00000000	0xf0118fd8
-0xf0118fbc:	0xf0102f00	0xf01c0000	0xf0102bc3	0xf0118fd8
-0xf0118fcc:	0xf0102ef7	0xf0118fd8	0x00010094	0xf0118ff8
-0xf0118fdc:	0xf01000a9	0xf01c0000	0x00000000	0x00001f10
-0xf0118fec:	0x00000000
+0xf01c1000:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c1010:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c1020:	0x00000023	0x00000023	0x00000000	0x00000000
+0xf01c1030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
+0xf01c1040:	0x00000023
 
 7.
-TO DO: TEORICA
+Afirmamos el funcionamiento de env_pop_tf viendo que restaura a cero todos los registros que se usaron en el proceso.
+vemos que los primeros 8 estan en cero ya que son los registros que se 'usan' en el trapframe.
 
 8. 
 (qemu) info registers
@@ -156,8 +148,8 @@ EIP=f0102ea1 EFL=00000096 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
 ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
 CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
 
-Vemos que todos los registros que usa Trapframe se setean en cero, luego claramente cambia el esp, eip
-y el cs.
+Vemos que todos los registros que usa Trapframe se setean en cero, luego claramente cambia el esp, eip, ya que tienen que ver
+con el flujo de la ejecucion, el que direccion de memoria saltar(eip) y el estado del stack(esp)
 
 9.
 (gdb) si
@@ -183,7 +175,7 @@ EIP=00800020 EFL=00000002 [-------] CPL=3 II=0 A20=1 SMM=0 HLT=0
 ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
 CS =001b 00000000 ffffffff 00cffa00 DPL=3 CS32 [-R-]
 
-vemos que no se notan muchos cambios, mas que los obvios como stack pointer, instruction pointer y code segment.
+Vemos que tampoco se notan muchos cambios, los 'obvios' mencionados en el punto anterior y ahora tambien el code segment.
 
 10.
 (gdb) tbreak syscall
@@ -230,4 +222,4 @@ Por el otro, 'user_evil_hello.c' le pasa a la syscall la dirección de memoria e
 
 
 2. ¿En qué cambia el comportamiento durante la ejecución? ¿Por qué? ¿Cuál es el mecanismo?
-#TO DO
+No cambia el comportamiento, ya que la salida es la misma, 

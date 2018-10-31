@@ -294,13 +294,14 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-	int i;
 	int kstacktop_i = KSTACKTOP;
-	for (i=0; i<NCPU; i++){
-		//TO DO, la parte de Invalid Memory, habria que hacer otro boop_map_region pero con otros permisos?
-		//pongo en size solo el KSTKSIZE y no el KSTKGAP(invalid Memory, que se pone por si hay overflow del CPUi kernel stack)
-		boot_map_region(kern_pgdir, kstacktop_i, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W); //backed by pm
-		kstacktop_i -= (KSTKSIZE+KSTKGAP);
+	int i;
+	for (i=0; i<NCPU; i++) {
+		// Mapeo el CPU i kernel stack (el invalid memory no se mapea)
+		// Empiezo en KSTACKTOP y le voy restando i*(KSTKSIZE+KSTKGAP)
+		// para pasar al siguiente kernel stack
+		boot_map_region(kern_pgdir, kstacktop_i - i*(KSTKSIZE+KSTKGAP),
+						KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
 	}
 }
 
@@ -355,11 +356,11 @@ page_init(void)
 		bool io_space = page_pa >= IOPHYSMEM && page_pa <= EXTPHYSMEM;
 		// - Espacio para el kernel y boot_alloc (desde EXTPHYSMEM hasta nextfree)
 		bool kernel_boot_alloc_space = page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
-		// - Pagina 7 (TP3)
-		bool mp_page = i==7;
+		// - Pagina 7 se reserva para el arranque
+		bool mpentry_page = i==7;
 
 		// No las agrego a la lista de paginas libres
-		bool invalid_page = first_page || io_space || kernel_boot_alloc_space || mp_page;
+		bool invalid_page = first_page || io_space || kernel_boot_alloc_space || mpentry_page;
 		if (invalid_page) {
 			continue;
 		}
@@ -733,14 +734,17 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	int perm = PTE_W | PTE_PCD | PTE_PWT;
-	size = ROUNDUP(size, PGSIZE);
-	if (size >= MMIOLIM) panic("overflow MMIOLIM");
-
-	boot_map_region(kern_pgdir, base, size, pa, perm);
-
-	return (void*) (base+size);
 	//panic("mmio_map_region not implemented");
+
+	int perm = PTE_W | PTE_PCD | PTE_PWT;
+	size_t size_aligned = ROUNDUP(size, PGSIZE);
+	if (base + size_aligned > MMIOLIM) {
+		panic("Overflow MMIOLIM");
+	}
+	boot_map_region(kern_pgdir, base, size_aligned, pa, perm);
+
+	//return (void*) (base+size_aligned);
+	return (void *) base;
 }
 
 static uintptr_t user_mem_check_addr;

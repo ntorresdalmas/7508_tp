@@ -294,6 +294,12 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	int i;
+	int kstacktop_i = KSTACKTOP;
+	for (i=0; i<NCPU; i++){
+		boot_map_region(kern_pgdir, kstacktop_i, KSTKSIZE+KSTKGAP, PADDR(percpu_kstacks[i]), PTE_W); //backed by pm
+		kstacktop_i -= i*(KSTKSIZE+KSTKGAP);
+	}
 }
 
 // --------------------------------------------------------------
@@ -332,6 +338,7 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+	_Static_assert(MPENTRY_PADDR % PGSIZE == 0, "MPENTRY_PADDR is not page-aligned");
 	size_t i;
 	for (i = 0; i < npages; i++) {
 		// nextfree page physicall address
@@ -346,9 +353,11 @@ page_init(void)
 		bool io_space = page_pa >= IOPHYSMEM && page_pa <= EXTPHYSMEM;
 		// - Espacio para el kernel y boot_alloc (desde EXTPHYSMEM hasta nextfree)
 		bool kernel_boot_alloc_space = page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
-		
+		// - Pagina 7 (TP3)
+		bool mp_page = i==7;
+
 		// No las agrego a la lista de paginas libres
-		bool invalid_page = first_page || io_space || kernel_boot_alloc_space;
+		bool invalid_page = first_page || io_space || kernel_boot_alloc_space || mp_page;
 		if (invalid_page) {
 			continue;
 		}
@@ -722,7 +731,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	int perm = PTE_W | PTE_PCD | PTE_PWT;
+	size = ROUNDUP(size, PGSIZE);
+	if (size >= MMIOLIM) panic("overflow MMIOLIM");
+
+	boot_map_region(kern_pgdir, base, size, pa, perm);
+
+	return (void*) (base+size);
+	//panic("mmio_map_region not implemented");
 }
 
 static uintptr_t user_mem_check_addr;

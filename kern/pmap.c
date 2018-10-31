@@ -297,8 +297,10 @@ mem_init_mp(void)
 	int i;
 	int kstacktop_i = KSTACKTOP;
 	for (i=0; i<NCPU; i++){
-		boot_map_region(kern_pgdir, kstacktop_i, KSTKSIZE+KSTKGAP, PADDR(percpu_kstacks[i]), PTE_W); //backed by pm
-		kstacktop_i -= i*(KSTKSIZE+KSTKGAP);
+		//TO DO, la parte de Invalid Memory, habria que hacer otro boop_map_region pero con otros permisos?
+		//pongo en size solo el KSTKSIZE y no el KSTKGAP(invalid Memory, que se pone por si hay overflow del CPUi kernel stack)
+		boot_map_region(kern_pgdir, kstacktop_i, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W); //backed by pm
+		kstacktop_i -= (KSTKSIZE+KSTKGAP);
 	}
 }
 

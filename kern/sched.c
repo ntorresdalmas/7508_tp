@@ -29,46 +29,38 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
-	// TO DO: idea --> podriamos hacer una copia del struct envs y enlazar
-	// envs[NENV-1] con envs[0] para que quede una lista circular
-	// struct Env *envs_circular = envs;
 
-	// Obtengo el curenv de la CPU actual
-	idle = thiscpu->cpu_env;
+	int index_curenv;
+	int index_nextenv;
+
 	// Obtengo el index del curenv en el array envs
-	int index_curenv = ENVX(idle->env_id);
-	// Me muevo al proximo (si es el ultimo, paso al 0)
-	bool last_env = index_curenv == NENV - 1;
-	int index_nextenv = last_env ? 0 : index_curenv + 1;
+	if (curenv) {
+		index_curenv = ENVX(curenv->env_id);
+
+		bool last_env = index_curenv == NENV - 1;
+		index_nextenv = last_env ? 0 : index_curenv + 1;
+	} else {
+		index_nextenv = 0;
+	}
 	
-	bool no_envs_runnable = true;
-	// TO DO: ver cual es la condicion de corte
-	while (1) {
-		int i;
-		// Recorro envs a partir del ultimo proceso que estaba corriendo + 1
-		for (i=index_nextenv; i<NENV; i++) {
-			if (envs[i].env_status == ENV_RUNNABLE) {
-				// Si hay un proceso en espera, lo pongo a correr
-				env_run(&envs[i]);
-				// Actualizo el index (si es el ultimo, paso al 0)
-				bool last_env = i == NENV - 1;
-				index_nextenv = last_env ? 0 : i + 1;
-				// Actualizo el booleano ya que aun quedan procesos por correr
-				no_envs_runnable = false;
-				break;
-			}
+	int index_actual;
+	int i;
+	for (i=0; i<NENV; i++) {
+		index_actual = (index_nextenv + i) % NENV;
+
+		if (envs[index_actual].env_status == ENV_RUNNABLE) {
+			env_run(&envs[index_actual]);
 		}
 	}
-	// Si recorri todos los procesos y no queda ninguno por correr,
-	// pongo a correr el que ya estaba corriendo la CPU actual
-	if (no_envs_runnable && thiscpu->cpu_env->env_status == ENV_RUNNING) {
-		env_run(thiscpu->cpu_env);
-	}			
 
-	// TO DO: ver donde va esto
+	if (curenv && curenv->env_status == ENV_RUNNING) {
+		env_run(curenv);
+	}
+
 	// sched_halt never returns
 	sched_halt();
 }
+
 
 // Halt this CPU when there is nothing to do. Wait until the
 // timer interrupt wakes it up. This function never returns.

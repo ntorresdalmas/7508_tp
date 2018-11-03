@@ -294,13 +294,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-	int kstacktop_i = KSTACKTOP;
 	int i;
 	for (i=0; i<NCPU; i++) {
 		// Mapeo el CPU i kernel stack (el invalid memory no se mapea)
 		// Empiezo en KSTACKTOP y le voy restando i*(KSTKSIZE+KSTKGAP)
 		// para pasar al siguiente kernel stack
-		boot_map_region(kern_pgdir, kstacktop_i - i*(KSTKSIZE+KSTKGAP),
+		// Le resto KSTKSIZE ya que boot_map_region mapea hacia arriba
+		boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE - i*(KSTKSIZE + KSTKGAP),
 						KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
 	}
 }
@@ -341,7 +341,9 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+	
 	_Static_assert(MPENTRY_PADDR % PGSIZE == 0, "MPENTRY_PADDR is not page-aligned");
+	
 	size_t i;
 	for (i = 0; i < npages; i++) {
 		// nextfree page physicall address
@@ -736,15 +738,22 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Your code here:
 	//panic("mmio_map_region not implemented");
 
+	// Me guardo la base previa
+	uintptr_t prev_base = base;
+	
 	int perm = PTE_W | PTE_PCD | PTE_PWT;
 	size_t size_aligned = ROUNDUP(size, PGSIZE);
+	
+	// Chequeo que no se pase de MMIOLIM
 	if (base + size_aligned > MMIOLIM) {
 		panic("Overflow MMIOLIM");
 	}
+	// Mapeo [pa, pa+size) con [base, base+size)
 	boot_map_region(kern_pgdir, base, size_aligned, pa, perm);
-
-	//return (void*) (base+size_aligned);
-	return (void *) base;
+	// Actualizo base
+	base += size_aligned;
+	// Devuelvo la base previa
+	return (void *) prev_base;
 }
 
 static uintptr_t user_mem_check_addr;

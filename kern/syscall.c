@@ -85,7 +85,22 @@ sys_exofork(void)
 	// will appear to return 0.
 
 	// LAB 4: Your code here.
-	panic("sys_exofork not implemented");
+	// panic("sys_exofork not implemented");
+	struct Env *new_env;
+	envid_t parent_id = curenv->env_id;
+
+	// Inicializo un nuevo proceso
+	int ret_value = env_alloc(&new_env, parent_id);
+	if (ret_value < 0) {
+		// ret_value = E_NO_FREE_ENV
+		return ret_value;
+	}
+	// Seteo el status del nuevo proceso
+	new_env->env_status = ENV_NOT_RUNNABLE;
+	// Le cargo los registros del curenv
+	new_env->env_tf.tf_regs = curenv->env_tf.tf_regs;
+
+	return new_env->env_id;
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -105,7 +120,20 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 
 	// LAB 4: Your code here.
-	panic("sys_env_set_status not implemented");
+	// panic("sys_env_set_status not implemented");
+	struct Env *e;
+
+	// Chequeo que el status es valido
+	if ((status != ENV_RUNNABLE) && (status != ENV_NOT_RUNNABLE)) {
+		return -E_INVAL;
+	}
+	// Obtengo el proceso y lo guardo en 'e'
+	int ret_value = envid2env(envid, &e, 1);
+	if (ret_value < 0) {
+		// ret_value = -E_BAD_ENV
+		return ret_value;
+	}
+	e->env_status = status;
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -150,7 +178,37 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	//   allocated!
 
 	// LAB 4: Your code here.
-	panic("sys_page_alloc not implemented");
+	// panic("sys_page_alloc not implemented");
+
+	// Obtengo el env asociado al envid
+	struct Env *e;
+	int ret_value_env = envid2env(envid, &e, 1);
+	if (ret_value_env < 0) {
+		return -E_BAD_ENV;
+	}
+
+	// Chequeo la va y los permisos
+	bool va_ok = (va < UTOP) && (va % PGSIZE == 0);
+	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+	if ((!va_ok) || (!perm_ok)) {
+		return -E_INVAL;
+	}
+
+	// Aloco una nueva pagina y la cargo con 0s
+	struct PageInfo *new_page = page_alloc(ALLOC_ZERO);
+	if (!new_page) {
+		return -E_NO_MEM;
+	}
+
+	// Mapeo la nueva pagina a la direccion virtual va
+	int ret_value = page_insert(e->env_pgdir, new_page, va, perm);
+	if (ret_value < 0) {
+		// Si falla page_insert, libero la pagina alocada
+		page_free(new_page);
+		// ret_value = -E_NO_MEM
+		return ret_value;
+	}
+	return 0;
 }
 
 // Map the page of memory at 'srcva' in srcenvid's address space
@@ -180,7 +238,39 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	//   check the current permissions on the page.
 
 	// LAB 4: Your code here.
-	panic("sys_page_map not implemented");
+	// panic("sys_page_map not implemented");
+
+	// Obtengo el env asociado al envid
+	struct Env *src_e;
+	struct Env *dst_e;
+	int ret_value_src = envid2env(srcenvid, &src_e, 1);
+	int ret_value_dst = envid2env(dstenvid, &dst_e, 1);
+	if ((ret_value_src < 0) || (ret_value_dst < 0)) {
+		return -E_BAD_ENV;
+	}
+
+	// Chequeo la va y los permisos
+	// TO DO: falta agregar un permiso al chequeo
+	bool srcva_ok = (srcva < UTOP) && (srcva % PGSIZE == 0);
+	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+	if ((!va_ok) || (!perm_ok)) {
+		return -E_INVAL;
+	}
+
+	// TO DO: falta chequear si srcva esta fuera del address space
+
+	// TO DO: ...
+	page_lookup();
+
+	// Mapeo la nueva pagina a la direccion virtual va
+	int ret_value = page_insert(dst_e->env_pgdir, ..., va, perm);
+	if (ret_value < 0) {
+		// Si falla page_insert, libero la pagina alocada
+		page_free(...);
+		// ret_value = -E_NO_MEM
+		return ret_value;
+	}
+	return 0;
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.

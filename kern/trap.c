@@ -87,7 +87,9 @@ void trap_18(void);
 void trap_19(void);
 void trap_20(void);
 // Excepciones 21 a 31 estan reservadas por Intel
-// Excepciones 32 a 255 estan libres para el usuario
+// Excepciones IRQ_OFFSET = 32 a IRQ_OFFSET + 15 = 47 son para IRQs
+void trap_32(void);
+
 void trap_48(void);
 
 
@@ -125,7 +127,10 @@ trap_init(void)
 	SETGATE(idt[19], 0, GD_KT, trap_19, 0);
 	SETGATE(idt[20], 0, GD_KT, trap_20, 0);
 	// Excepciones 21 a 31 estan reservadas por Intel
-	// Excepciones 32 a 255 estan libres para el usuario
+	// Excepciones IRQ_OFFSET = 32 a IRQ_OFFSET + 15 = 47 son para IRQs
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_32, 0);
+
+
 	SETGATE(idt[48], 0, GD_KT, trap_48, 3);
 
 	// Per-CPU setup
@@ -263,6 +268,10 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		sched_yield();
+		return;
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);

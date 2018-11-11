@@ -86,14 +86,13 @@ sys_exofork(void)
 
 	// LAB 4: Your code here.
 	// panic("sys_exofork not implemented");
+	
 	struct Env *new_env;
 	envid_t parent_id = curenv->env_id;
 
 	// Inicializo un nuevo proceso
-	int ret_value = env_alloc(&new_env, parent_id);
-	if (ret_value < 0) {
-		// ret_value = E_NO_FREE_ENV
-		return ret_value;
+	if (env_alloc(&new_env, parent_id) < 0) {
+		return E_NO_FREE_ENV;
 	}
 	// Seteo el status del nuevo proceso
 	new_env->env_status = ENV_NOT_RUNNABLE;
@@ -121,17 +120,15 @@ sys_env_set_status(envid_t envid, int status)
 
 	// LAB 4: Your code here.
 	// panic("sys_env_set_status not implemented");
+	
 	struct Env *e;
-
-	// Chequeo que el status es valido
+	// Chequeo que el status sea valido
 	if ((status != ENV_RUNNABLE) && (status != ENV_NOT_RUNNABLE)) {
 		return -E_INVAL;
 	}
 	// Obtengo el proceso y lo guardo en 'e'
-	int ret_value = envid2env(envid, &e, 1);
-	if (ret_value < 0) {
-		// ret_value = -E_BAD_ENV
-		return ret_value;
+	if (envid2env(envid, &e, 1) < 0) {
+		return -E_BAD_ENV;
 	}
 	e->env_status = status;
 }
@@ -182,31 +179,25 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	// Obtengo el env asociado al envid
 	struct Env *e;
-	int ret_value_env = envid2env(envid, &e, 1);
-	if (ret_value_env < 0) {
+	if (envid2env(envid, &e, 1) < 0) {
 		return -E_BAD_ENV;
 	}
-
 	// Chequeo la va y los permisos
 	bool va_ok = (va < UTOP) && (va % PGSIZE == 0);
 	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
 	if ((!va_ok) || (!perm_ok)) {
 		return -E_INVAL;
 	}
-
 	// Aloco una nueva pagina y la cargo con 0s
 	struct PageInfo *new_page = page_alloc(ALLOC_ZERO);
 	if (!new_page) {
 		return -E_NO_MEM;
 	}
-
 	// Mapeo la nueva pagina a la direccion virtual va
-	int ret_value = page_insert(e->env_pgdir, new_page, va, perm);
-	if (ret_value < 0) {
+	if (page_insert(e->env_pgdir, new_page, va, perm) < 0) {
 		// Si falla page_insert, libero la pagina alocada
 		page_free(new_page);
-		// ret_value = -E_NO_MEM
-		return ret_value;
+		return -E_NO_MEM;
 	}
 	return 0;
 }
@@ -240,35 +231,36 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	// LAB 4: Your code here.
 	// panic("sys_page_map not implemented");
 
-	// Obtengo el env asociado al envid
-	struct Env *src_e;
-	struct Env *dst_e;
-	int ret_value_src = envid2env(srcenvid, &src_e, 1);
-	int ret_value_dst = envid2env(dstenvid, &dst_e, 1);
-	if ((ret_value_src < 0) || (ret_value_dst < 0)) {
+	// Obtengo los env asociados a los envid
+	struct Env *src_env;
+	struct Env *dst_env;	
+	if (envid2env(srcenvid, &src_env, 1) < 0) || (envid2env(dstenvid, &dst_env, 1) < 0) {
 		return -E_BAD_ENV;
-	}
-
+	}	
 	// Chequeo la va y los permisos
-	// TO DO: falta agregar un permiso al chequeo
+	// TO DO: -E_INVAL is srcva is not mapped in srcenvid's address space.
 	bool srcva_ok = (srcva < UTOP) && (srcva % PGSIZE == 0);
+	bool dstva_ok = (dstva < UTOP) && (dstva % PGSIZE == 0);
+	// TO DO: -E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's address space.
+	bool read_only_ok = (perm & PTE_W) && (); 
 	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
-	if ((!va_ok) || (!perm_ok)) {
+	if ((!srcva_ok) || (!dstva_ok) || (!read_only_ok) || (!perm_ok)) {
 		return -E_INVAL;
 	}
-
-	// TO DO: falta chequear si srcva esta fuera del address space
-
-	// TO DO: ...
-	page_lookup();
-
-	// Mapeo la nueva pagina a la direccion virtual va
-	int ret_value = page_insert(dst_e->env_pgdir, ..., va, perm);
-	if (ret_value < 0) {
-		// Si falla page_insert, libero la pagina alocada
-		page_free(...);
-		// ret_value = -E_NO_MEM
-		return ret_value;
+	// Obtengo la pagina mapeada en srcva
+	// TO DO: ver que se hace con este pte_t
+	pte_t *pgtab_entry;
+	struct PageInfo *src_page = page_lookup(src_env->env_pgdir, srcva, &pgtab_entry);
+	if (!src_page) {
+		// TO DO: ver que devolver aca
+		return -1;
+	}
+	// Mapeo la pagina de srcva en dstva
+	if (page_insert(dst_env->env_pgdir, src_page, dstva, perm) < 0) {
+		// Si falla page_insert, libero la pagina
+		// TO DO: ver que se libera
+		page_free(src_page);
+		return -E_NO_MEM;
 	}
 	return 0;
 }

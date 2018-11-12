@@ -183,7 +183,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 		return -E_BAD_ENV;
 	}
 	// Chequeo la va y los permisos
-	bool va_ok = (va < UTOP) && (va % PGSIZE == 0);
+	bool va_ok = ((uintptr_t) va < UTOP) && ((uintptr_t) va % PGSIZE == 0);
 	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
 	if ((!va_ok) || (!perm_ok)) {
 		return -E_INVAL;
@@ -234,15 +234,15 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	// Obtengo los env asociados a los envid
 	struct Env *src_env;
 	struct Env *dst_env;	
-	if (envid2env(srcenvid, &src_env, 1) < 0) || (envid2env(dstenvid, &dst_env, 1) < 0) {
+	if ((envid2env(srcenvid, &src_env, 1) < 0) || (envid2env(dstenvid, &dst_env, 1) < 0)) {
 		return -E_BAD_ENV;
 	}	
 	// Chequeo la va y los permisos
 	// TO DO: -E_INVAL is srcva is not mapped in srcenvid's address space.
-	bool srcva_ok = (srcva < UTOP) && (srcva % PGSIZE == 0);
-	bool dstva_ok = (dstva < UTOP) && (dstva % PGSIZE == 0);
+	bool srcva_ok = ((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE == 0);
+	bool dstva_ok = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);
 	// TO DO: -E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's address space.
-	bool read_only_ok = (perm & PTE_W) && (); 
+	bool read_only_ok = (perm & PTE_W) && (1); 
 	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
 	if ((!srcva_ok) || (!dstva_ok) || (!read_only_ok) || (!perm_ok)) {
 		return -E_INVAL;
@@ -278,7 +278,21 @@ sys_page_unmap(envid_t envid, void *va)
 	// Hint: This function is a wrapper around page_remove().
 
 	// LAB 4: Your code here.
-	panic("sys_page_unmap not implemented");
+	//panic("sys_page_unmap not implemented");
+
+	// Obtengo el env asociado al envid
+	struct Env *e;
+	if (envid2env(envid, &e, 1) < 0) {
+		return -E_BAD_ENV;
+	}
+	// Chequeo la va
+	bool va_ok = ((uintptr_t) va < UTOP) && ((uintptr_t) va % PGSIZE == 0);
+	if (!va_ok) {
+		return -E_INVAL;
+	}
+	// Unmapeo la pagina en va
+	page_remove(e->env_pgdir, va);
+	return 0;
 }
 
 // Try to send 'value' to the target env 'envid'.

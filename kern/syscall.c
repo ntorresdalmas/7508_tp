@@ -184,7 +184,11 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	}
 	// Chequeo la va y los permisos
 	bool va_ok = ((uintptr_t) va < UTOP) && ((uintptr_t) va % PGSIZE == 0);
-	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+
+	// primero fijarse si (PTE_U | PTE_P) pertenecen a perm
+	// luego fijarme si perm pertenece a PTE_SYSCALL.
+	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+
 	if ((!va_ok) || (!perm_ok)) {
 		return -E_INVAL;
 	}
@@ -236,14 +240,13 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	struct Env *dst_env;	
 	if ((envid2env(srcenvid, &src_env, 1) < 0) || (envid2env(dstenvid, &dst_env, 1) < 0)) {
 		return -E_BAD_ENV;
-	}	
+	}
 	// Chequeo la va y los permisos
-	// TO DO: -E_INVAL is srcva is not mapped in srcenvid's address space.
 	bool srcva_ok = ((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE == 0);
-	bool dstva_ok = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);
+	bool dstva_ok = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);	
 	// TO DO: -E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's address space.
-	bool read_only_ok = (perm & PTE_W) && (1); 
-	bool perm_ok = (perm == (PTE_U | PTE_P)) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+	bool read_only_ok = (perm & PTE_W) && (1);
+	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
 	if ((!srcva_ok) || (!dstva_ok) || (!read_only_ok) || (!perm_ok)) {
 		return -E_INVAL;
 	}
@@ -252,13 +255,11 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	pte_t *pgtab_entry;
 	struct PageInfo *src_page = page_lookup(src_env->env_pgdir, srcva, &pgtab_entry);
 	if (!src_page) {
-		// TO DO: ver que devolver aca
-		return -1;
+		return -E_INVAL;
 	}
 	// Mapeo la pagina de srcva en dstva
 	if (page_insert(dst_env->env_pgdir, src_page, dstva, perm) < 0) {
 		// Si falla page_insert, libero la pagina
-		// TO DO: ver que se libera
 		page_free(src_page);
 		return -E_NO_MEM;
 	}
@@ -290,7 +291,7 @@ sys_page_unmap(envid_t envid, void *va)
 	if (!va_ok) {
 		return -E_INVAL;
 	}
-	// Unmapeo la pagina en va
+	// Unmapeo la pagina en va. si no hay pagina mapeada, no hace nada.
 	page_remove(e->env_pgdir, va);
 	return 0;
 }

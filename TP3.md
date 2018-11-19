@@ -62,3 +62,43 @@ Welcome to the JOS kernel monitor!
 Type 'help' for a list of commands.
 K> "
 Como se llama 3 veces a ENV_CREATE(), tenemos los enviorments 1000, 1001 y 1002. Y notar que los va liberando ordenadamente.
+
+
+envid2env
+---------
+
+1. en JOS, si un proceso llama a sys_env_destroy(0)
+si el envid es cero, llama a env_destroy(curenv), es decir, libera el proceso que esta corriendo actualmente.
+
+2. en Linux, si un proceso llama a kill(0, 9)
+TO DO: deberia leer el manual kill?
+
+3. JOS: sys_env_destroy(-1)
+TO DO: estoy 93% seguro.
+deberia indicar error, ya que los envid son todos positivos, excepto el 0(caso especial) que vimos en el punto anterior.
+(si le paso a envid2env(-1, ...), la macro ENVX(-1)).
+
+4. Linux: kill(-1, 9)
+TO DO: deberia leer el manual kill?
+
+
+dumbfork
+---------
+
+1. Si, antes de llamar a dumbfork(), el proceso se reserva a sí mismo una página con sys_page_alloc() ¿se propagará una copia al proceso hijo? ¿Por qué?
+
+2. ¿Se preserva el estado de solo-lectura en las páginas copiadas? Mostrar, con código en espacio de usuario, cómo saber si una dirección de memoria es modificable por el proceso, o no. (Ayuda: usar las variables globales uvpd y/o uvpt.)
+
+3. Describir el funcionamiento de la función duppage().
+
+ Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo:
+4. indicar qué llamada adicional se debería hacer si el booleano es true
+
+5. describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
+
+6. ¿Por qué se usa ROUNDDOWN(&addr) para copiar el stack? ¿Qué es addr y por qué, si el stack crece hacia abajo, se usa ROUNDDOWN y no ROUNDUP?
+
+
+
+
+---------

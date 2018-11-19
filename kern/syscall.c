@@ -185,8 +185,8 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	// Chequeo la va y los permisos
 	bool va_ok = ((uintptr_t) va < UTOP) && ((uintptr_t) va % PGSIZE == 0);
 
-	// primero fijarse si (PTE_U | PTE_P) pertenecen a perm
-	// luego fijarme si perm pertenece a PTE_SYSCALL.
+	// Chequeo que (PTE_U | PTE_P) pertenezcan a perm
+	// Y que perm pertenezca a PTE_SYSCALL.
 	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
 
 	if ((!va_ok) || (!perm_ok)) {
@@ -243,24 +243,27 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	}
 	// Chequeo la va y los permisos
 	bool srcva_ok = ((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE == 0);
-	bool dstva_ok = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);	
-	// TO DO: -E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's address space.
-	bool read_only_ok = (perm & PTE_W) && (1);
+	bool dstva_ok = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);
 	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
-	if ((!srcva_ok) || (!dstva_ok) || (!read_only_ok) || (!perm_ok)) {
+	if ((!srcva_ok) || (!dstva_ok) || (!perm_ok)) {
 		return -E_INVAL;
 	}
 	// Obtengo la pagina mapeada en srcva
-	// TO DO: ver que se hace con este pte_t
 	pte_t *pgtab_entry;
 	struct PageInfo *src_page = page_lookup(src_env->env_pgdir, srcva, &pgtab_entry);
+	// Si page_lookup devuelve NULL quiere decir que srcva no esta mapeada
+	// en el address space de srcenvid
 	if (!src_page) {
+		return -E_INVAL;
+	}
+	// Chequeo que el proceso no quiera mapear una pagina con PTE_W
+	// en una pagina sin PTE_W
+	bool read_only_ok = (perm == (perm & PTE_W) && (*pgtab_entry & PTE_W));
+	if (!read_only_ok) {
 		return -E_INVAL;
 	}
 	// Mapeo la pagina de srcva en dstva
 	if (page_insert(dst_env->env_pgdir, src_page, dstva, perm) < 0) {
-		// Si falla page_insert, libero la pagina
-		page_free(src_page);
 		return -E_NO_MEM;
 	}
 	return 0;
@@ -291,7 +294,7 @@ sys_page_unmap(envid_t envid, void *va)
 	if (!va_ok) {
 		return -E_INVAL;
 	}
-	// Unmapeo la pagina en va. si no hay pagina mapeada, no hace nada.
+	// Unmapeo la pagina en va. Si no hay pagina mapeada, no hace nada.
 	page_remove(e->env_pgdir, va);
 	return 0;
 }
@@ -380,6 +383,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_getenvid();
 		case SYS_env_destroy:
 			return sys_env_destroy((envid_t) a1);
+		case SYS_yield:
+			sched_yield();
 		default:
 			return -E_INVAL;
 	}

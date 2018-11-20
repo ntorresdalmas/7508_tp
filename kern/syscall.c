@@ -98,6 +98,9 @@ sys_exofork(void)
 	// Le cargo los registros del curenv
 	new_env->env_tf.tf_regs = curenv->env_tf.tf_regs;
 
+	bool is_parent = new_env->env_id == parent_id;
+	new_env->env_id = is_parent ? new_env->env_id : 0;
+	
 	return new_env->env_id;
 }
 
@@ -181,7 +184,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	if (envid2env(envid, &e, 1) < 0) {
 		return -E_BAD_ENV;
 	}
-	// Chequeo la va y los permisos
+	// Chequeo la va
 	bool va_ok = ((uintptr_t) va < UTOP) && ((uintptr_t) va % PGSIZE == 0);
 
 	// Chequeo que (PTE_U | PTE_P) pertenezcan a perm
@@ -257,7 +260,7 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	}
 	// Chequeo que el proceso no quiera mapear una pagina con PTE_W
 	// en una pagina sin PTE_W
-	bool read_only_ok = (perm == (perm & PTE_W) && (*pgtab_entry & PTE_W));
+	bool read_only_ok = (perm == (perm | PTE_W) && (*pgtab_entry | PTE_W));
 	if (!read_only_ok) {
 		return -E_INVAL;
 	}

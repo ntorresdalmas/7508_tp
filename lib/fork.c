@@ -58,6 +58,24 @@ duppage(envid_t envid, unsigned pn)
 	return 0;
 }
 
+static void
+dup_or_share(envid_t dstenv, void *va, int perm)
+{
+	int r;
+	// TO DO: codear bien esta funcion
+	// si la pagina es de solo lectura, se comparte en lugar de crear una copia
+	if ((r = sys_page_alloc(dstenv, va, perm)) < 0) {
+		panic("sys_page_alloc: %e", r);
+	}
+	if ((r = sys_page_map(dstenv, va, 0, UTEMP, perm)) < 0) {
+		panic("sys_page_map: %e", r);
+	}
+	memmove(UTEMP, va, PGSIZE);
+	if ((r = sys_page_unmap(0, UTEMP)) < 0) {
+		panic("sys_page_unmap: %e", r);
+	}
+}
+
 //
 // User-level fork with copy-on-write.
 // Set up our page fault handler appropriately.
@@ -78,8 +96,8 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	panic("fork not implemented");
-	//return fork_v0();
+	// panic("fork not implemented");
+	return fork_v0();
 }
 
 // Challenge!
@@ -90,43 +108,48 @@ sfork(void)
 	return -E_INVAL;
 }
 
-/*
+
 envid_t
 fork_v0(void)
 {
 	envid_t envid;
-
+	int r;
+	
 	envid = sys_exofork();
-	// envid invalido. (ver si poner un panic o retornar el envid(<0) )
-	if (envid < 0)
-		panic("invalid envid in fork()");
-
+	if (envid < 0) {
+		panic("envid invalido.");
+	}
 	if (envid == 0) {
-		// We're the child.
-		// The copied value of the global variable 'thisenv'
-		// is no longer valid (it refers to the parent!).
-		//TO DO: esto lo saque de dumbfork(), sera lo pedido?
+		// Es el proceso hijo
+		// Actualizo la variable thisenv ya que se refiere al padre
 		thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
 	
-	// envid > 0
+	// Es el proceso padre
+	// Obtengo el env asociado al envid
+	struct Env *e;
+	if (envid2env(envid, &e, 1) < 0) {
+		return -E_BAD_ENV;
+	}
 	int i;
-	for (i=0; i<UTOP; i++){
-		void *actual_va;
-		// si ya esta mapeada
-	
-		if (){
-			dup_or_share(envid, va, );
+	for (i=0; i<=UTOP; i+=PGSIZE){
+		// Obtengo la pagina mapeada en va = i
+		pte_t *pgtab_entry;
+		struct PageInfo *page = page_lookup(e->env_pgdir, i, &pgtab_entry);
+		if (page) {
+			dup_or_share(envid, (void *) i, *pgtab_entry & PTE_SYSCALL);
 		}
-		else
-			duppage(envid, i);
-	
 	}
 
+	// Seteo el proceso hijo como ENV_RUNNABLE
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0) {
+		panic("sys_env_set_status: %e", r);
+	}
+
+	return envid;
 
 //extern volatile pte_t uvpt[];     // VA of "virtual page table"
 //extern volatile pde_t uvpd[];     // VA of current page directory
 	
 }
-*/

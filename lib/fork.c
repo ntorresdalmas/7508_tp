@@ -79,6 +79,7 @@ fork(void)
 {
 	// LAB 4: Your code here.
 	panic("fork not implemented");
+	//return fork_v0();
 }
 
 // Challenge!
@@ -88,3 +89,44 @@ sfork(void)
 	panic("sfork not implemented");
 	return -E_INVAL;
 }
+
+/*
+envid_t
+fork_v0(void)
+{
+	envid_t envid;
+
+	envid = sys_exofork();
+	// envid invalido. (ver si poner un panic o retornar el envid(<0) )
+	if (envid < 0)
+		panic("invalid envid in fork()");
+
+	if (envid == 0) {
+		// We're the child.
+		// The copied value of the global variable 'thisenv'
+		// is no longer valid (it refers to the parent!).
+		//TO DO: esto lo saque de dumbfork(), sera lo pedido?
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+	
+	// envid > 0
+	int i;
+	for (i=0; i<UTOP; i++){
+		void *actual_va;
+		// si ya esta mapeada
+	
+		if (){
+			dup_or_share(envid, va, );
+		}
+		else
+			duppage(envid, i);
+	
+	}
+
+
+//extern volatile pte_t uvpt[];     // VA of "virtual page table"
+//extern volatile pde_t uvpd[];     // VA of current page directory
+	
+}
+*/

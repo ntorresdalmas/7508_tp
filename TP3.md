@@ -71,7 +71,7 @@ envid2env
 si el envid es cero, llama a env_destroy(curenv), es decir, libera el proceso que esta corriendo actualmente.
 
 2. en Linux, si un proceso llama a kill(0, 9)
-TO DO: deberia leer el manual kill?
+si el pid es cero, envia la señal (9) a todo proceso dentro del grupo de procesos que se encuentra el actual. La señal 9 indica claramente que debe quitarse.
 
 3. JOS: sys_env_destroy(-1)
 TO DO: estoy 93% seguro.
@@ -79,7 +79,7 @@ deberia indicar error, ya que los envid son todos positivos, excepto el 0(caso e
 (si le paso a envid2env(-1, ...), la macro ENVX(-1)).
 
 4. Linux: kill(-1, 9)
-TO DO: deberia leer el manual kill?
+si el pid es -1, envia la señal (9) a todo proceso tal que el actual tenga permiso de enviarle señales.
 
 
 dumbfork

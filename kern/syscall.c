@@ -86,13 +86,12 @@ sys_exofork(void)
 
 	// LAB 4: Your code here.
 	// panic("sys_exofork not implemented");
-	
 	struct Env *new_env;
 	envid_t parent_id = curenv->env_id;
-
+	int r;
 	// Inicializo un nuevo proceso
-	if (env_alloc(&new_env, parent_id) < 0) {
-		return E_NO_FREE_ENV;
+	if ((r = env_alloc(&new_env, parent_id)) < 0) {
+		return r;
 	}
 	// Seteo el status del nuevo proceso
 	new_env->env_status = ENV_NOT_RUNNABLE;

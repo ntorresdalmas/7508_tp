@@ -97,7 +97,7 @@ sys_exofork(void)
 	// Seteo el status del nuevo proceso
 	new_env->env_status = ENV_NOT_RUNNABLE;
 	// Le cargo los registros del curenv
-	new_env->env_tf.tf_regs = curenv->env_tf.tf_regs;
+	new_env->env_tf = curenv->env_tf;
 	// Seteo el valor de retorno en 0 para el hijo
 	new_env->env_tf.tf_regs.reg_eax = 0;
 	

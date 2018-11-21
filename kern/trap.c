@@ -130,7 +130,6 @@ trap_init(void)
 	// Excepciones IRQ_OFFSET = 32 a IRQ_OFFSET + 15 = 47 son para IRQs
 	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_32, 0);
 
-
 	SETGATE(idt[48], 0, GD_KT, trap_48, 3);
 
 	// Per-CPU setup
@@ -163,6 +162,34 @@ trap_init_percpu(void)
 	// user space on that CPU.
 	//
 	// LAB 4: Your code here:
+
+	/*
+	// Obtengo la CPU actual y su Taskstate
+	int id = cpunum();
+	struct CpuInfo *cpu = &cpus[id];
+	struct Taskstate *ts = &cpu->cpu_ts;
+
+	// Calculo el segmento e indice para cada core adicional
+	uint16_t idx = (GD_TSS0 >> 3) + id;
+	// TO DO: ver donde usar esta variable
+	uint16_t seg = idx << 3;
+
+	// Seteo el TSS para obtener el stack correcto cuando trapeamos al kernel
+	ts->ts_esp0 = KSTACKTOP - KSTKSIZE - id*(KSTKSIZE + KSTKGAP);
+	ts->ts_ss0 = GD_KD;
+	ts->ts_iomb = sizeof(struct Taskstate);
+
+	// Inicializo el TSS slot para la GDT
+	gdt[idx] = SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1, 0);
+	gdt[idx].sd_s = 0;
+
+	// Cargo la TSS selector
+	// (like other segment selectors, the bottom three bits are special; we leave them 0)
+	ltr(GD_TSS0);
+
+	// Cargo la IDT
+	lidt(&idt_pd);
+	*/
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
@@ -310,6 +337,8 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+		lock_kernel();
+		
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie

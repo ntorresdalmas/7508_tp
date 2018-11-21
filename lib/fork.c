@@ -96,8 +96,8 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	// panic("fork not implemented");
-	return fork_v0();
+	panic("fork not implemented");
+	// return fork_v0();
 }
 
 // Challenge!
@@ -109,12 +109,12 @@ sfork(void)
 }
 
 
-envid_t
+static envid_t
 fork_v0(void)
 {
 	envid_t envid;
 	int r;
-	
+
 	envid = sys_exofork();
 	if (envid < 0) {
 		panic("envid invalido.");
@@ -128,6 +128,7 @@ fork_v0(void)
 	
 	// Es el proceso padre
 	// Obtengo el env asociado al envid
+	/*
 	struct Env *e;
 	if (envid2env(envid, &e, 1) < 0) {
 		return -E_BAD_ENV;
@@ -146,7 +147,7 @@ fork_v0(void)
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0) {
 		panic("sys_env_set_status: %e", r);
 	}
-
+	*/
 	return envid;
 
 //extern volatile pte_t uvpt[];     // VA of "virtual page table"

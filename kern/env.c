@@ -577,6 +577,9 @@ env_run(struct Env *e)
 	// Cambio el espacio virtual de direcciones (kernel --> proceso)
 	lcr3(PADDR(e->env_pgdir));
 
+	// Libero el big kernel lock
+	unlock_kernel();
+
 	// Restauro los registros del proceso
 	env_pop_tf(&e->env_tf);
 }

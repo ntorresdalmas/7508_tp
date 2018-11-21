@@ -61,18 +61,26 @@ duppage(envid_t envid, unsigned pn)
 static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
+	bool read_only = !(perm == (perm | PTE_W));
 	int r;
-	// TO DO: codear bien esta funcion
-	// si la pagina es de solo lectura, se comparte en lugar de crear una copia
-	if ((r = sys_page_alloc(dstenv, va, perm)) < 0) {
-		panic("sys_page_alloc: %e", r);
-	}
-	if ((r = sys_page_map(dstenv, va, 0, UTEMP, perm)) < 0) {
-		panic("sys_page_map: %e", r);
-	}
-	memmove(UTEMP, va, PGSIZE);
-	if ((r = sys_page_unmap(0, UTEMP)) < 0) {
-		panic("sys_page_unmap: %e", r);
+	// Si la pagina es de solo lectura, la comparto con el hijo
+	if (read_only) {
+		// TODO: ver si estan bien los parametros
+		if ((r = sys_page_map(dstenv, va, 0, va, perm)) < 0) {
+			panic("sys_page_map: %e", r);
+		}
+	} else {
+	// Si no, la copio
+		if ((r = sys_page_alloc(dstenv, va, perm)) < 0) {
+			panic("sys_page_alloc: %e", r);
+		}
+		if ((r = sys_page_map(dstenv, va, 0, UTEMP, perm)) < 0) {
+			panic("sys_page_map: %e", r);
+		}
+		memmove(UTEMP, va, PGSIZE);
+		if ((r = sys_page_unmap(0, UTEMP)) < 0) {
+			panic("sys_page_unmap: %e", r);
+		}
 	}
 }
 
@@ -97,7 +105,7 @@ fork(void)
 {
 	// LAB 4: Your code here.
 	panic("fork not implemented");
-	// return fork_v0();
+	//return fork_v0();
 }
 
 // Challenge!
@@ -109,48 +117,40 @@ sfork(void)
 }
 
 
-static envid_t
+envid_t
 fork_v0(void)
 {
 	envid_t envid;
 	int r;
 
 	envid = sys_exofork();
+
 	if (envid < 0) {
-		panic("envid invalido.");
+		panic("sys_exofork: %e", envid);
 	}
+	// Es el proceso hijo
 	if (envid == 0) {
-		// Es el proceso hijo
-		// Actualizo la variable thisenv ya que se refiere al padre
+		// Actualizo la variable thisenv ya que referencia al padre
 		thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
-	
 	// Es el proceso padre
-	// Obtengo el env asociado al envid
-	/*
-	struct Env *e;
-	if (envid2env(envid, &e, 1) < 0) {
-		return -E_BAD_ENV;
-	}
-	int i;
-	for (i=0; i<=UTOP; i+=PGSIZE){
-		// Obtengo la pagina mapeada en va = i
-		pte_t *pgtab_entry;
-		struct PageInfo *page = page_lookup(e->env_pgdir, i, &pgtab_entry);
-		if (page) {
-			dup_or_share(envid, (void *) i, *pgtab_entry & PTE_SYSCALL);
+	int va;
+	for (va=0; va<UTOP; va+=PGSIZE){
+		// Obtengo la direccion del page directory entry
+		pde_t actual_pde = uvpd[PDX(va)];
+		// Obtengo la direccion del page table entry
+		pte_t actual_pte = uvpt[actual_pde];
+		// Si tiene el bit de presencia --> hay una pagina mapeada
+		bool is_maped = actual_pte & PTE_P;
+		// Si hay pagina mapeada, la comparto con el hijo
+		if (is_maped) {
+			dup_or_share(envid, (void *) va, actual_pte & PTE_SYSCALL);
 		}
 	}
-
 	// Seteo el proceso hijo como ENV_RUNNABLE
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0) {
 		panic("sys_env_set_status: %e", r);
 	}
-	*/
-	return envid;
-
-//extern volatile pte_t uvpt[];     // VA of "virtual page table"
-//extern volatile pde_t uvpd[];     // VA of current page directory
-	
+	return envid;	
 }

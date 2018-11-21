@@ -163,6 +163,7 @@ trap_init_percpu(void)
 	//
 	// LAB 4: Your code here:
 
+	// TODO: comentar el ts global definido arriba de este archivo
 	/*
 	// Obtengo la CPU actual y su Taskstate
 	int id = cpunum();

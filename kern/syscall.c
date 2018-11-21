@@ -96,11 +96,11 @@ sys_exofork(void)
 	// Seteo el status del nuevo proceso
 	new_env->env_status = ENV_NOT_RUNNABLE;
 	// Le cargo los registros del curenv
-	// TO DO: aca hay algun registro que tengo que guardarlo aparte,
+	// TODO: aca hay algun registro que tengo que guardarlo aparte,
 	// ahi esta el truquito
-	//uint32_t aux_eax = new_env->env_tf.tf_regs.reg_eax;
-	new_env->env_tf.tf_regs = curenv->env_tf.tf_regs;
-	//new_env->env_tf.tf_regs.reg_eax = aux_eax;
+	uint32_t aux_ebp = new_env->env_tf.tf_regs.reg_ebp;
+	new_env->env_tf = curenv->env_tf;
+	new_env->env_tf.tf_regs.reg_ebp = aux_ebp;
 	
 	return new_env->env_id;
 }

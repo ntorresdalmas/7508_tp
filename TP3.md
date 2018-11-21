@@ -86,19 +86,52 @@ dumbfork
 ---------
 
 1. Si, antes de llamar a dumbfork(), el proceso se reserva a sí mismo una página con sys_page_alloc() ¿se propagará una copia al proceso hijo? ¿Por qué?
+TO DO:
 
 2. ¿Se preserva el estado de solo-lectura en las páginas copiadas? Mostrar, con código en espacio de usuario, cómo saber si una dirección de memoria es modificable por el proceso, o no. (Ayuda: usar las variables globales uvpd y/o uvpt.)
+TO DO: ver las variables uvpd y uvpt
 
 3. Describir el funcionamiento de la función duppage().
+Esta funcion recibe el numero de id y una direccion virtual donde, primero se va a alocar una pagina y luego la mapea segun el addr con los permisos de escritura y de user en una region temporaria ya que la funcion para mapear necesita 2 ids y direcciones. Luego con memmove() la mueve de la region temporaria a la addr. Por ultimo saca de esa region temporaria(UTEMP) lo que aloco, asi se libera.
 
  Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo:
 4. indicar qué llamada adicional se debería hacer si el booleano es true
+Crear una variable: perm = (PTE_P|PTE_U|PTE_W) y si el booleano es true, cambiar sacando el PTE_W de los permisos.
+TO DO: o habria que llamar a una funcion?
 
 5. describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
+TO DO:
 
 6. ¿Por qué se usa ROUNDDOWN(&addr) para copiar el stack? ¿Qué es addr y por qué, si el stack crece hacia abajo, se usa ROUNDDOWN y no ROUNDUP?
+Para alinear la direccion con PGSIZE. addr es la direccion que queda despues de copiar el address space en el hijo (despues del for). Justamente se usa ROUNDDOWN ya que sino pisaria otro address space, cuando tiene que compartir el espacio con el heap.
 
 
-
-
+multicore_init
 ---------
+
+1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?
+memmove(code, mpentry_start, mpentry_end - mpentry_start);
+
+
+2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?
+
+
+3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack
+
+
+4. En el archivo kern/mpentry.S se puede leer:
+"# We cannot use kern_pgdir yet because we are still
+# running at a low EIP.
+movl $(RELOC(entry_pgdir)), %eax"
+	¿Qué valor tiene el registro %eip cuando se ejecuta esa línea?
+
+	Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.
+
+	¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?	
+
+
+5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP.
+
+
+6. 
+

@@ -86,6 +86,7 @@ sys_exofork(void)
 
 	// LAB 4: Your code here.
 	// panic("sys_exofork not implemented");
+
 	struct Env *new_env;
 	envid_t parent_id = curenv->env_id;
 	int r;
@@ -96,11 +97,9 @@ sys_exofork(void)
 	// Seteo el status del nuevo proceso
 	new_env->env_status = ENV_NOT_RUNNABLE;
 	// Le cargo los registros del curenv
-	// TODO: aca hay algun registro que tengo que guardarlo aparte,
-	// ahi esta el truquito
-	uint32_t aux_ebp = new_env->env_tf.tf_regs.reg_ebp;
-	new_env->env_tf = curenv->env_tf;
-	new_env->env_tf.tf_regs.reg_ebp = aux_ebp;
+	new_env->env_tf.tf_regs = curenv->env_tf.tf_regs;
+	// Seteo el valor de retorno en 0 para el hijo
+	new_env->env_tf.tf_regs.reg_eax = 0;
 	
 	return new_env->env_id;
 }
@@ -134,6 +133,8 @@ sys_env_set_status(envid_t envid, int status)
 		return -E_BAD_ENV;
 	}
 	e->env_status = status;
+
+	return 0;
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -388,6 +389,16 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_env_destroy((envid_t) a1);
 		case SYS_yield:
 			sched_yield();
+		case SYS_exofork:
+			return sys_exofork();
+		case SYS_page_alloc:
+			return sys_page_alloc((envid_t) a1, (void *) a2, (int) a3);
+		case SYS_page_map:
+			return sys_page_map((envid_t) a1, (void *) a2, (envid_t) a3, (void *) a4, (int) a5);
+		case SYS_page_unmap:
+			return sys_page_unmap((envid_t) a1, (void *) a2);
+		case SYS_env_set_status:
+			return sys_env_set_status((envid_t) a1, (int) a2);
 		default:
 			return -E_INVAL;
 	}

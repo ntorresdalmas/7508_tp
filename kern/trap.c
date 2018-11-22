@@ -14,7 +14,7 @@
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
 
-static struct Taskstate ts;
+// static struct Taskstate ts;
 
 /* For debugging, so print_trapframe can distinguish between printing
  * a saved trapframe and printing the current trapframe and print some
@@ -163,35 +163,30 @@ trap_init_percpu(void)
 	//
 	// LAB 4: Your code here:
 
-	// TODO: comentar el ts global definido arriba de este archivo
-	/*
-	// Obtengo la CPU actual y su Taskstate
+	// Obtengo el id de la CPU actual
 	int id = cpunum();
-	struct CpuInfo *cpu = &cpus[id];
-	struct Taskstate *ts = &cpu->cpu_ts;
 
 	// Calculo el segmento e indice para cada core adicional
 	uint16_t idx = (GD_TSS0 >> 3) + id;
-	// TO DO: ver donde usar esta variable
 	uint16_t seg = idx << 3;
 
 	// Seteo el TSS para obtener el stack correcto cuando trapeamos al kernel
-	ts->ts_esp0 = KSTACKTOP - KSTKSIZE - id*(KSTKSIZE + KSTKGAP);
-	ts->ts_ss0 = GD_KD;
-	ts->ts_iomb = sizeof(struct Taskstate);
+	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - id*(KSTKSIZE + KSTKGAP);
+	thiscpu->cpu_ts.ts_ss0 = GD_KD;
+	thiscpu->cpu_ts.ts_iomb = sizeof(struct Taskstate);
 
 	// Inicializo el TSS slot para la GDT
-	gdt[idx] = SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1, 0);
+	gdt[idx] = SEG16(STS_T32A, (uint32_t)(&thiscpu->cpu_ts), sizeof(struct Taskstate) - 1, 0);
 	gdt[idx].sd_s = 0;
 
-	// Cargo la TSS selector
+	// Cargo la TSS selector para cada core adicional
 	// (like other segment selectors, the bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
+	ltr(GD_TSS0 + 8*id);
 
 	// Cargo la IDT
 	lidt(&idt_pd);
-	*/
 
+	/*
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
 	ts.ts_esp0 = KSTACKTOP;
@@ -209,6 +204,7 @@ trap_init_percpu(void)
 
 	// Load the IDT
 	lidt(&idt_pd);
+	*/
 }
 
 void

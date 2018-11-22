@@ -84,39 +84,6 @@ dup_or_share(envid_t dstenv, void *va, int perm)
 	}
 }
 
-//
-// User-level fork with copy-on-write.
-// Set up our page fault handler appropriately.
-// Create a child.
-// Copy our address space and page fault handler setup to the child.
-// Then mark the child as runnable and return.
-//
-// Returns: child's envid to the parent, 0 to the child, < 0 on error.
-// It is also OK to panic on error.
-//
-// Hint:
-//   Use uvpd, uvpt, and duppage.
-//   Remember to fix "thisenv" in the child process.
-//   Neither user exception stack should ever be marked copy-on-write,
-//   so you must allocate a new page for the child's user exception stack.
-//
-envid_t
-fork(void)
-{
-	// LAB 4: Your code here.
-	panic("fork not implemented");
-	//return fork_v0();
-}
-
-// Challenge!
-int
-sfork(void)
-{
-	panic("sfork not implemented");
-	return -E_INVAL;
-}
-
-
 envid_t
 fork_v0(void)
 {
@@ -140,9 +107,9 @@ fork_v0(void)
 		// Obtengo la direccion del page directory entry
 		pde_t actual_pde = uvpd[PDX(va)];
 		// Obtengo la direccion del page table entry
-		pte_t actual_pte = uvpt[actual_pde];
+		pte_t actual_pte = uvpt[PTX(actual_pde)];
 		// Si tiene el bit de presencia --> hay una pagina mapeada
-		bool is_maped = actual_pte & PTE_P;
+		bool is_maped = actual_pte | PTE_P;
 		// Si hay pagina mapeada, la comparto con el hijo
 		if (is_maped) {
 			dup_or_share(envid, (void *) va, actual_pte & PTE_SYSCALL);
@@ -153,4 +120,36 @@ fork_v0(void)
 		panic("sys_env_set_status: %e", r);
 	}
 	return envid;	
+}
+
+//
+// User-level fork with copy-on-write.
+// Set up our page fault handler appropriately.
+// Create a child.
+// Copy our address space and page fault handler setup to the child.
+// Then mark the child as runnable and return.
+//
+// Returns: child's envid to the parent, 0 to the child, < 0 on error.
+// It is also OK to panic on error.
+//
+// Hint:
+//   Use uvpd, uvpt, and duppage.
+//   Remember to fix "thisenv" in the child process.
+//   Neither user exception stack should ever be marked copy-on-write,
+//   so you must allocate a new page for the child's user exception stack.
+//
+envid_t
+fork(void)
+{
+	// LAB 4: Your code here.
+	//panic("fork not implemented");
+	return fork_v0();
+}
+
+// Challenge!
+int
+sfork(void)
+{
+	panic("sfork not implemented");
+	return -E_INVAL;
 }

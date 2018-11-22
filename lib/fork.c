@@ -61,8 +61,8 @@ duppage(envid_t envid, unsigned pn)
 static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
-	bool not_writeable = !(perm == (perm | PTE_W));
 	int r;
+	bool not_writeable = !(perm == (perm | PTE_W));
 	// Si la pagina es de solo lectura, la comparto con el hijo
 	if (not_writeable) {
 		if ((r = sys_page_map(0, va, dstenv, va, perm)) < 0) {
@@ -70,10 +70,10 @@ dup_or_share(envid_t dstenv, void *va, int perm)
 		}
 	} else {
 	// Si no, la copio
-		if ((r = sys_page_alloc(dstenv, va, perm)) < 0) {
+		if ((r = sys_page_alloc(dstenv, va, PTE_P|PTE_U|PTE_W)) < 0) {
 			panic("sys_page_alloc: %e", r);
 		}
-		if ((r = sys_page_map(dstenv, va, 0, UTEMP, perm)) < 0) {
+		if ((r = sys_page_map(dstenv, va, 0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
 			panic("sys_page_map: %e", r);
 		}
 		memmove(UTEMP, va, PGSIZE);
@@ -101,21 +101,23 @@ fork_v0(void)
 		return 0;
 	}
 	// Es el proceso padre
+	bool is_maped;
 	int va;
 	for (va=0; va<UTOP; va+=PGSIZE){
 		// Obtengo la direccion del page directory entry
 		pde_t actual_pde = uvpd[PDX(va)];
-		// Obtengo la direccion del page table entry
-		pte_t actual_pte = uvpt[PGNUM(actual_pde)];
 		// Si tiene el bit de presencia --> hay una pagina mapeada
-		bool is_maped = (actual_pte == (actual_pte | PTE_P));
+		is_maped = (actual_pde == (actual_pde | PTE_P));
 
-		// TODO: ver si esta bien este chequeo
-		bool perm_sys_ok = (PTE_SYSCALL == (actual_pte | PTE_SYSCALL));
-
-		// Si hay pagina mapeada, la comparto con el hijo
-		if (is_maped && perm_sys_ok) {
-			dup_or_share(envid, (void *) va, actual_pte);
+		if (is_maped) {
+			// Obtengo la direccion del page table entry
+			pte_t actual_pte = uvpt[PGNUM(va)];
+			// Si tiene el bit de presencia --> hay una pagina mapeada
+			is_maped = (actual_pte == (actual_pte | PTE_P));
+			// Si hay pagina mapeada, la comparto con el hijo
+			if (is_maped) {
+				dup_or_share(envid, (void *) va, actual_pte | PTE_SYSCALL);
+			}
 		}
 	}
 	// Seteo el proceso hijo como ENV_RUNNABLE

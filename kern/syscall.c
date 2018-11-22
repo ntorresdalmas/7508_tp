@@ -260,10 +260,9 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	if (!src_page) {
 		return -E_INVAL;
 	}
-	// Chequeo que el proceso no quiera mapear una pagina con PTE_W
-	// en una pagina sin PTE_W
-	bool read_only_ok = (perm == (perm | PTE_W) && (*pgtab_entry | PTE_W));
-	if (!read_only_ok) {
+	// Chequeo que el proceso no quiera mapear una pagina con PTE_W en una pagina sin PTE_W
+	bool not_writeable = (perm == (perm | PTE_W)) && !(*pgtab_entry == (*pgtab_entry | PTE_W));
+	if (not_writeable) {
 		return -E_INVAL;
 	}
 	// Mapeo la pagina de srcva en dstva

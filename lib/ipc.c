@@ -64,7 +64,30 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	// LAB 4: Your code here.
-	panic("ipc_send not implemented");
+	// panic("ipc_send not implemented");
+
+	// Guardo la pagina enviada por el emisor
+	uintptr_t dstva;
+	if (pg) {
+		dstva = (uintptr_t) pg;
+	} else {
+		dstva = -E_INVAL;
+	}
+	// Intento enviar el mensaje hasta lograrlo
+	int r;
+	bool message_sent = 0;
+	while (!message_sent) {
+		// Llamo a la syscall
+		if ((r = sys_ipc_try_send(to_env, val, (void *) dstva, perm) < 0)) {
+			if (r==-E_IPC_NOT_RECV) {
+				sys_yield();
+			} else {
+				panic("Error inesperado");
+			}
+		} else {
+			message_sent = 1;
+		}
+	}
 }
 
 // Find the first environment of the given type.  We'll use this to

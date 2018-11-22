@@ -128,9 +128,10 @@ multicore_init
 
 1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?
 memmove(code, mpentry_start, mpentry_end - mpentry_start);
-
+Copia la direccion virtual correspondiente a la fisica en donde empiezan los non-boot CPUs (APs) en mpentry_start(variable global).
 
 2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?
+TODO: leer parte A del lab4 del MIT
 
 
 3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack

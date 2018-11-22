@@ -23,8 +23,33 @@ int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
 	// LAB 4: Your code here.
-	panic("ipc_recv not implemented");
-	return 0;
+	// panic("ipc_recv not implemented");
+	
+	// Guardo la pagina enviada por el emisor
+	uintptr_t dstva;
+	if (pg) {
+		dstva = (uintptr_t) pg;
+	} else {
+		dstva = -E_INVAL;
+	}
+	// Guardo el envid del emisor
+	if (from_env_store) {
+		*from_env_store = thisenv->env_ipc_from;
+	}
+	// Guardo los permisos de la pagina enviada por el emisor
+	// Solo si se guardo efectivamente una pagina en pg
+	if (perm_store && pg) {
+		*perm_store = thisenv->env_ipc_perm;
+	}
+	// Llamo a la syscall
+	int r;
+	if ((r = sys_ipc_recv((void *) dstva)) < 0) {
+		if (from_env_store) *from_env_store = 0;
+		if (perm_store) *perm_store = 0;
+		return r;
+	}
+
+	return thisenv->env_ipc_value;
 }
 
 // Send 'val' (and 'pg' with 'perm', if 'pg' is nonnull) to 'toenv'.

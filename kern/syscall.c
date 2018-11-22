@@ -344,7 +344,57 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	// panic("sys_ipc_try_send not implemented");
+
+	int r;
+	struct Env *e;
+	// Chequeo que el exista el envid
+	if ((r = envid2env(envid, &e, 0)) < 0) {
+		return r;
+	}
+	// Chequeo que el reciever efectivamente este esperando un mensaje
+	if (!e->env_ipc_recving) {
+		return -E_IPC_NOT_RECV;
+	}
+	// Chequeo que srcva este alineada
+	if (((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE != 0)) {
+		return -E_INVAL;
+	}
+	// Chequeo los permisos
+	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+	if (((uintptr_t) srcva < UTOP) && (!perm_ok)) {
+		return -E_INVAL;
+	}
+	// Chequeo que srcva este mapeada en el address space de curenv (caller)
+	pte_t *pgtab_entry;
+	struct PageInfo *src_page = page_lookup(curenv->env_pgdir, srcva, &pgtab_entry);
+	if (((uintptr_t) srcva < UTOP) && (!src_page)) {
+		return -E_INVAL;
+	}
+	// Chequeo que el proceso no quiera mapear una pagina con PTE_W en una pagina sin PTE_W
+	bool not_writeable = (perm == (perm | PTE_W)) && !(*pgtab_entry == (*pgtab_entry | PTE_W));
+	if (not_writeable) {
+		return -E_INVAL;
+	}
+	// Comparto la pagina entre el caller y el receiver
+	// Solo si el receiver la esta esperando (dstva > 0)
+	bool map_page = 0;
+	if (((uintptr_t) srcva < UTOP) && (e->env_ipc_dstva > 0)) {
+		if ((r = sys_page_map(curenv->env_id, srcva, envid, e->env_ipc_dstva, perm)) < 0) {
+			return r;
+		} else {
+			map_page = 1;
+		}
+	}
+	// Cargo los campos correspondientes del receiver
+	e->env_ipc_recving = 0;
+	e->env_ipc_from = curenv->env_id;
+	e->env_ipc_value = value;
+	e->env_ipc_perm = map_page ? perm : 0;
+	e->env_status = ENV_RUNNABLE;
+	e->env_tf.tf_regs.reg_eax = 0;
+
+	return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -362,7 +412,19 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	// panic("sys_ipc_recv not implemented");
+	
+	bool dstva_not_aligned = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE != 0);
+	if (dstva_not_aligned) {
+		return -E_INVAL;
+	}
+	// Marco el proceso como NOT_RUNNABLE
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	curenv->env_ipc_recving = true;
+
+	// Mapeo la pagina recibida
+	curenv->env_ipc_dstva = dstva;
+
 	return 0;
 }
 
@@ -398,6 +460,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_page_unmap((envid_t) a1, (void *) a2);
 		case SYS_env_set_status:
 			return sys_env_set_status((envid_t) a1, (int) a2);
+		case SYS_ipc_try_send:
+			return sys_ipc_try_send((envid_t) a1, (uint32_t) a2, (void *) a3, (unsigned) a4);
+		case SYS_ipc_recv:
+			return sys_ipc_recv((void *) a1);
 		default:
 			return -E_INVAL;
 	}

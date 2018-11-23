@@ -164,15 +164,17 @@ Por otro lado, se utiliza ROUNDDOWN porque justamente nos interesa mapear el pri
 
 1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?
 memmove(code, mpentry_start, mpentry_end - mpentry_start);
-Copia la direccion virtual correspondiente a la fisica en donde empiezan los non-boot CPUs (APs) en mpentry_start(variable global).
+
+Copia la dirección virtual correspondiente a la dirección física en donde empiezan los non-boot CPUs (APs) en mpentry_start (variable global).
 
 2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?
-TODO: leer parte A del lab4 del MIT
+
+:construction: TODO: leer parte A del lab4 del MIT
 
 
 3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack
 
-"
+""
 $ make gdb
 gdb -q -s obj/kern/kernel -ex 'target remote 127.0.0.1:26000' -n -x .gdbinit
 Reading symbols from obj/kern/kernel...done.
@@ -247,20 +249,21 @@ Old value = (void *) 0xf0254000 <percpu_kstacks+98304>
 New value = (void *) 0xf025c000 <percpu_kstacks+131072>
 boot_aps () at kern/init.c:110
 110			lapic_startap(c->cpu_id, PADDR(code));
-"
+""
 
 4. En el archivo kern/mpentry.S se puede leer:
 "# We cannot use kern_pgdir yet because we are still running at a low EIP.
 movl $(RELOC(entry_pgdir)), %eax"
 ¿Qué valor tiene el registro %eip cuando se ejecuta esa línea?
-
 Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.
 
 ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?	
 
+:construction:
 
 5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP.
 
+:construction:
 
 -------
 :clubs: ipc_rev

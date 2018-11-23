@@ -32,6 +32,13 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	} else {
 		dstva = UTOP;
 	}
+	// Llamo a la syscall
+	int r;
+	if ((r = sys_ipc_recv((void *) dstva)) < 0) {
+		if (from_env_store) *from_env_store = 0;
+		if (perm_store) *perm_store = 0;
+		return r;
+	}
 	// Guardo el envid del emisor
 	if (from_env_store) {
 		*from_env_store = thisenv->env_ipc_from;
@@ -40,13 +47,6 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	// Solo si se guardo efectivamente una pagina en pg
 	if (perm_store && pg) {
 		*perm_store = thisenv->env_ipc_perm;
-	}
-	// Llamo a la syscall
-	int r;
-	if ((r = sys_ipc_recv((void *) dstva)) < 0) {
-		if (from_env_store) *from_env_store = 0;
-		if (perm_store) *perm_store = 0;
-		return r;
 	}
 
 	return thisenv->env_ipc_value;
@@ -78,7 +78,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 	bool message_sent = 0;
 	while (!message_sent) {
 		// Llamo a la syscall
-		if ((r = sys_ipc_try_send(to_env, val, (void *) srcva, perm) < 0)) {
+		if ((r = sys_ipc_try_send(to_env, val, (void *) srcva, perm)) < 0) {
 			if (r==-E_IPC_NOT_RECV) {
 				sys_yield();
 			} else {

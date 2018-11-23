@@ -365,6 +365,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	if (!e->env_ipc_recving) {
 		return -E_IPC_NOT_RECV;
 	}
+	/*
 	// Chequeo que srcva este alineada
 	if (((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE != 0)) {
 		return -E_INVAL;
@@ -385,9 +386,10 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	if (not_writeable) {
 		return -E_INVAL;
 	}
-	// Comparto la pagina entre el caller y el receiver
+	*/
+	// Comparto la pagina entre el caller y el receiver si srcva < UTOP y dstva < UTOP
 	bool map_page = 0;
-	if (((uintptr_t) srcva == UTOP) || ((uintptr_t) e->env_ipc_dstva == UTOP)) {
+	if (((uintptr_t) srcva < UTOP) && ((uintptr_t) e->env_ipc_dstva < UTOP)) {
 		if ((r = sys_page_map(curenv->env_id, srcva, envid, e->env_ipc_dstva, perm)) < 0) {
 			return r;
 		} else {
@@ -431,11 +433,6 @@ sys_ipc_recv(void *dstva)
 
 	// Mapeo la pagina recibida
 	curenv->env_ipc_dstva = dstva;
-
-	// Cargo el valor de retorno
-	curenv->env_tf.tf_regs.reg_eax = 0;
-
-	sys_yield();
 
 	return 0;
 }

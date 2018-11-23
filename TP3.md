@@ -172,16 +172,91 @@ TODO: leer parte A del lab4 del MIT
 
 3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack
 
+"
+$ make gdb
+gdb -q -s obj/kern/kernel -ex 'target remote 127.0.0.1:26000' -n -x .gdbinit
+Reading symbols from obj/kern/kernel...done.
+Remote debugging using 127.0.0.1:26000
+warning: No executable has been specified and target does not support
+determining executable automatically.  Try using the "file" command.
+0x0000fff0 in ?? ()
+(gdb) watch mpentry_kstack
+Hardware watchpoint 1: mpentry_kstack
+(gdb) continue
+Continuing.
+The target architecture is assumed to be i386
+=> 0xf010019b <boot_aps+127>:	mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0x0
+New value = (void *) 0xf024c000 <percpu_kstacks+65536>
+boot_aps () at kern/init.c:110
+110			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) bt
+#0  boot_aps () at kern/init.c:110
+#1  0xf0100229 in i386_init () at kern/init.c:56
+#2  0xf0100047 in relocated () at kern/entry.S:88
+(gdb) info threads
+  Id   Target Id         Frame 
+* 1    Thread 1 (CPU#0 [running]) boot_aps () at kern/init.c:110
+  2    Thread 2 (CPU#1 [halted ]) 0x000fd412 in ?? ()
+  3    Thread 3 (CPU#2 [halted ]) 0x000fd412 in ?? ()
+  4    Thread 4 (CPU#3 [halted ]) 0x000fd412 in ?? ()
+(gdb) continue
+Continuing.
+=> 0xf010019b <boot_aps+127>:	mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0xf024c000 <percpu_kstacks+65536>
+New value = (void *) 0xf0254000 <percpu_kstacks+98304>
+boot_aps () at kern/init.c:110
+110			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) info threads
+  Id   Target Id         Frame 
+* 1    Thread 1 (CPU#0 [running]) boot_aps () at kern/init.c:110
+  2    Thread 2 (CPU#1 [running]) spin_lock (
+    lk=0xf01213c0 <kernel_lock>) at kern/spinlock.c:71
+  3    Thread 3 (CPU#2 [halted ]) 0x000fd412 in ?? ()
+  4    Thread 4 (CPU#3 [halted ]) 0x000fd412 in ?? ()
+(gdb) thread 2
+[Switching to thread 2 (Thread 2)]
+#0  spin_lock (lk=0xf01213c0 <kernel_lock>) at kern/spinlock.c:71
+71		while (xchg(&lk->locked, 1) != 0)
+(gdb) bt
+#0  spin_lock (lk=0xf01213c0 <kernel_lock>) at kern/spinlock.c:71
+#1  0xf010006d in lock_kernel () at ./kern/spinlock.h:33
+#2  0xf01002b9 in mp_main () at kern/init.c:135
+#3  0x00007060 in ?? ()
+(gdb) p cpunum()
+$1 = 1
+(gdb) thread 1
+[Switching to thread 1 (Thread 1)]
+#0  boot_aps () at kern/init.c:112
+112			while(c->cpu_status != CPU_STARTED)
+(gdb) p cpnum()
+No symbol "cpnum" in current context.
+(gdb) continue
+Continuing.
+=> 0xf010019b <boot_aps+127>:	mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0xf0254000 <percpu_kstacks+98304>
+New value = (void *) 0xf025c000 <percpu_kstacks+131072>
+boot_aps () at kern/init.c:110
+110			lapic_startap(c->cpu_id, PADDR(code));
+"
 
 4. En el archivo kern/mpentry.S se puede leer:
-"# We cannot use kern_pgdir yet because we are still
-# running at a low EIP.
+"# We cannot use kern_pgdir yet because we are still running at a low EIP.
 movl $(RELOC(entry_pgdir)), %eax"
-	¿Qué valor tiene el registro %eip cuando se ejecuta esa línea?
+¿Qué valor tiene el registro %eip cuando se ejecuta esa línea?
 
-	Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.
+Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.
 
-	¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?	
+¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?	
 
 
 5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP.

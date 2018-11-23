@@ -27,15 +27,14 @@ Caso contrario lo destruye, se fija si está el env actual corriendo y llama a s
 :clubs: sys_yield
  
 2. Leer y estudiar el código del programa user/yield.c. Cambiar la función i386_init() para lanzar tres instancias de dicho programa, y mostrar y explicar la salida de make qemu-nox.
-
-"" 
+```
 $ make qemu-nox
 + cc kern/init.c
 + ld obj/kern/kernel
 + mk obj/kern/kernel.img
-***
-*** Use Ctrl-a x to exit qemu
-***
+
+Use Ctrl-a x to exit qemu
+
 qemu-system-i386 -nographic -drive file=obj/kern/kernel.img,index=0,media=disk,format=raw -serial mon:stdio -gdb tcp:127.0.0.1:26000 -D qemu.log -smp 1  -d guest_errors
 6828 decimal is 15254 octal!
 Physical memory: 131072K available, base = 640K, extended = 130432K
@@ -66,8 +65,7 @@ No runnable environments in the system!
 Welcome to the JOS kernel monitor!
 Type 'help' for a list of commands.
 K>
-""
-
+```
 Considerando que se llama 3 veces a ENV_CREATE(), tenemos los environments 1000, 1001 y 1002.
 Notar que los va liberando de manera ordenada.
  
@@ -107,7 +105,7 @@ No, no se preserva el estado de solo-lectura en las páginas copiadas, ya que la
 no recibe permisos como parámetros, sino que le pasa siempre tres flags fijos tanto a sys_page_alloc como a sys_page_map. En particular, estos flags son PTE_P | PTE_U | PTE_W. Éste último es, justamente, el que marca como writeable a todas las páginas copiadas.
 
 Código en user-space para saber si una dirección de memoria es modificable por el proceso, o no:
-
+```c
 for (va=0; va<UTOP; va+=PGSIZE){
 		// Obtengo la direccion del page directory entry
 		pde_t actual_pde = uvpd[PDX(va)];
@@ -121,7 +119,7 @@ for (va=0; va<UTOP; va+=PGSIZE){
 			is_writeable = (actual_pte == (actual_pte | PTE_W));
 		}
 }
-
+```
 3. Describir el funcionamiento de la función duppage().
 
 Primero, aloca una página en la dirección recibida con los permisos PTE_U | PTE_P | PTE_W
@@ -133,11 +131,11 @@ Cuarto, libera la dirección temporal alocada.
 4. Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo. Indicar qué llamada adicional se debería hacer si el booleano es true.
 
 Supongamos que la firma de duppage ahora es:
-
+```c
 duppage(envid_t dstenv, void *addr, bool read_only);
-
+```
 En este caso, bastaría con chequear el parámetro booleano para saber si los permisos deben modificarse o no. Por ejemplo:
-
+```c
 duppage(envid_t dstenv, void *addr, bool read_only) {
 	int perm;
 	if (read_only) {
@@ -146,7 +144,7 @@ duppage(envid_t dstenv, void *addr, bool read_only) {
 		perm = PTE_P | PTE_U | PTE_W;
 	}
 }
-
+```
 De esta forma, se puede ver que, si el booleano es true, la página se copiará sin permisos de escritura (read-only).
 
 5. Describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
@@ -169,12 +167,11 @@ Copia la dirección virtual correspondiente a la dirección física en donde emp
 
 2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?
 
-:construction: TODO: leer parte A del lab4 del MIT
-
+:construction:
+TODO: leer parte A del lab4 del MIT
 
 3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack
-
-""
+```
 $ make gdb
 gdb -q -s obj/kern/kernel -ex 'target remote 127.0.0.1:26000' -n -x .gdbinit
 Reading symbols from obj/kern/kernel...done.
@@ -249,11 +246,12 @@ Old value = (void *) 0xf0254000 <percpu_kstacks+98304>
 New value = (void *) 0xf025c000 <percpu_kstacks+131072>
 boot_aps () at kern/init.c:110
 110			lapic_startap(c->cpu_id, PADDR(code));
-""
-
+```
 4. En el archivo kern/mpentry.S se puede leer:
+```
 "# We cannot use kern_pgdir yet because we are still running at a low EIP.
 movl $(RELOC(entry_pgdir)), %eax"
+```
 ¿Qué valor tiene el registro %eip cuando se ejecuta esa línea?
 Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.
 
@@ -269,7 +267,7 @@ Responder con redondeo a 12 bits, justificando desde qué región de memoria se 
 :clubs: ipc_rev
 
 1. Un proceso podría intentar enviar el valor númerico -E_INVAL vía ipc_send(). ¿Cómo es posible distinguir si es un error, o no? En estos casos:
-
+```c
     // Versión A
     envid_t src = -1;
     int r = ipc_recv(&src, 0, NULL);
@@ -286,15 +284,15 @@ Responder con redondeo a 12 bits, justificando desde qué región de memoria se 
         puts("Hubo error.");
       else
         puts("Valor negativo correcto.")
-
+```
 Para la versión A puedo detectar si se trata de un error o no si en la variable &src (en nuestra función es from_env_store) quedó almacenado un 0 o el envid del emisor. Es decir, la condición podría ser:
-
+```c
 if (from_env_store == 0) {
 	puts("Hubo error.");
 } else {
 	puts("Valor negativo correcto.");
 }
-
+```
 En cambio, para la versión B no hay forma de detectar si se trata de un valor o un código de error, ya que la función ipc_recv recibe NULL como primer parámetro. Ergo, no hay estructura en donde almacenar lo explicado para la versión anterior.
 
 
@@ -304,8 +302,9 @@ En cambio, para la versión B no hay forma de detectar si se trata de un valor o
 1. ¿Cómo se podría hacer bloqueante esta llamada? Esto es: qué estrategia de implementación se podría usar para que, si un proceso A intenta enviar a B, pero B no está esperando un mensaje, el proceso A sea puesto en estado ENV_NOT_RUNNABLE, y sea despertado una vez B llame a ipc_recv().
 
 Podría modificarse la condición que comprueba si el proceso destino está esperando o no un mensaje:
-
+```c
 if (!e->env_ipc_recving) {
 	curenv->env_status = ENV_NOT_RUNNABLE;
 	sys_yield();
 }
+```

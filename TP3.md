@@ -1,16 +1,16 @@
 :octocat: TP3: Multitarea con desalojo :octocat:
 ========================
  
+-------------
 static_assert
----------
  
 1. ¿Cómo y por qué funciona la macro static_assert que define JOS?
 Para la evaluacion(comparacion) se le deben pasar constantes (que no cambien a lo largo de la ejecucion del programa), por eso este assert hace la comparacion en tiempo de compilacion. Esto es ya que esta definida la macro con un switch(x) case 0: case(x)
 y si x es 0(false), siempre cae en case 0 y produce un error en tiempo de compilacion.
  
  
+----------
 env_return
----------
  
 1. al terminar un proceso su función umain() ¿dónde retoma la ejecución el kernel? Describir la secuencia de llamadas desde que termina umain() hasta que el kernel dispone del proceso.
 TODO:
@@ -19,8 +19,8 @@ TODO:
 Ahora env_destroy(e) primero detecta si el env a eliminar esta corriendo en otro CPU, en este caso le cambia el estado para que la proxima vez el Kernel lo detecte, lo libere. Sino lo destruye, se fija si esta el env actual corriendo y en este caso llama a sched_yield() para detectar el proximo env a ejecutar (usando round robin).
  
  
-sys_yield
 ---------
+sys_yield
  
 2. Leer y estudiar el código del programa user/yield.c. Cambiar la función i386_init() para lanzar tres instancias de dicho programa, y mostrar y explicar la salida de make qemu-nox.
  
@@ -64,8 +64,8 @@ K> "
 Como se llama 3 veces a ENV_CREATE(), tenemos los enviorments 1000, 1001 y 1002. Y notar que los va liberando ordenadamente.
  
  
-envid2env
 ---------
+envid2env
  
 1. en JOS, si un proceso llama a sys_env_destroy(0)
 Si el envid es cero, llama a env_destroy(curenv), es decir, libera el proceso que esta corriendo actualmente.
@@ -81,8 +81,8 @@ Indica error, ya que los envid son todos positivos, excepto el 0(caso especial) 
 Si el pid es -1, envia la señal (9) a todo proceso tal que el actual tenga permiso de enviarle señales.
 
 
+--------
 dumbfork
----------
 
 1. Si, antes de llamar a dumbfork(), el proceso se reserva a sí mismo una página con sys_page_alloc() ¿se propagará una copia al proceso hijo? ¿Por qué?
 
@@ -135,15 +135,16 @@ De esta forma, se puede ver que si el booleano es True, la página se copiará s
 
 5. describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
 
-TO DO:
+El algoritmo descripto en el punto 4 cumple con este requisito.
 
 6. ¿Por qué se usa ROUNDDOWN(&addr) para copiar el stack? ¿Qué es addr y por qué, si el stack crece hacia abajo, se usa ROUNDDOWN y no ROUNDUP?
 
-Para alinear la direccion con PGSIZE. addr es la direccion que queda despues de copiar el address space en el hijo (despues del for).
-TO DO: es para alinear la direccion tal que quede en la posicion del stack, asi lo copio.
+Se utiliza &addr porque es una variable local y, por lo tanto, vive en el stack.
+Por otro lado, se utiliza ROUNDDOWN porque justamente nos interesa mapear el principio de la página.
 
+
+--------------
 multicore_init
----------
 
 1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?
 memmove(code, mpentry_start, mpentry_end - mpentry_start);
@@ -245,5 +246,44 @@ Responder con redondeo a 12 bits, justificando desde qué región de memoria se 
 5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP.
 
 
-6. 
+-------
+ipc_rev
 
+1. Un proceso podría intentar enviar el valor númerico -E_INVAL vía ipc_send(). ¿Cómo es posible distinguir si es un error, o no? En estos casos:
+
+    // Versión A
+    envid_t src = -1;
+    int r = ipc_recv(&src, 0, NULL);
+    if (r < 0)
+      if (/* ??? */)
+        puts("Hubo error.");
+      else
+        puts("Valor negativo correcto.")
+
+    // Versión B
+    int r = ipc_recv(NULL, 0, NULL);
+    if (r < 0)
+      if (/* ??? */)
+        puts("Hubo error.");
+      else
+        puts("Valor negativo correcto.")
+
+Para la versión A puedo detectar si se trata de un error o no si en la variable &src (en nuestra función es from_env_store) quedó almacenado un 0 o el envid del emisor. Es decir, la condición podría ser:
+
+if (from_env_store == 0) {
+	puts("Hubo error.");
+} else {
+	puts("Valor negativo correcto.");
+}
+
+En cambio, para la versión B no hay forma de detectar si se trata de un valor o un código de error, ya que la función ipc_recv recibe NULL como primer parámetro. Ergo, no hay estructura en donde almacenar lo explicado para la versión anterior.
+
+
+----------------
+sys_ipc_try_send
+
+1.
+
+2.
+
+3.

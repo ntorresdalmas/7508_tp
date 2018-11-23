@@ -1,36 +1,29 @@
-TP3: Multitarea con desalojo :shipit:
+:octocat: TP3: Multitarea con desalojo :octocat:
 ========================
-
+ 
 static_assert
 ---------
-
+ 
 1. ¿Cómo y por qué funciona la macro static_assert que define JOS?
-
-Para la evaluacion(comparacion) se le deben pasar consatntes (que no cambien a lo largo de la ejecucion del programa), por eso este assert hace la comparacion en tiempo de compilacion.
-TO DO: como el static_assert se compone de un switch-case. si el valor que recibe es un cero...
-
-
+Para la evaluacion(comparacion) se le deben pasar constantes (que no cambien a lo largo de la ejecucion del programa), por eso este assert hace la comparacion en tiempo de compilacion. Esto es ya que esta definida la macro con un switch(x) case 0: case(x)
+y si x es 0(false), siempre cae en case 0 y produce un error en tiempo de compilacion.
+ 
+ 
 env_return
 ---------
-
+ 
 1. al terminar un proceso su función umain() ¿dónde retoma la ejecución el kernel? Describir la secuencia de llamadas desde que termina umain() hasta que el kernel dispone del proceso.
-
-TODO: no se si habla en general la funcion umain().
-
+TODO:
+ 
 2. ¿en qué cambia la función env_destroy() en este TP, respecto al TP anterior?
-
 Ahora env_destroy(e) primero detecta si el env a eliminar esta corriendo en otro CPU, en este caso le cambia el estado para que la proxima vez el Kernel lo detecte, lo libere. Sino lo destruye, se fija si esta el env actual corriendo y en este caso llama a sched_yield() para detectar el proximo env a ejecutar (usando round robin).
-
-
+ 
+ 
 sys_yield
 ---------
-
-1. 
-
-TODO ni idea lo que hay que hacer.
-
-2. 
-
+ 
+2. Leer y estudiar el código del programa user/yield.c. Cambiar la función i386_init() para lanzar tres instancias de dicho programa, y mostrar y explicar la salida de make qemu-nox.
+ 
 " $ make qemu-nox
 + cc kern/init.c
 + ld obj/kern/kernel
@@ -69,28 +62,23 @@ Welcome to the JOS kernel monitor!
 Type 'help' for a list of commands.
 K> "
 Como se llama 3 veces a ENV_CREATE(), tenemos los enviorments 1000, 1001 y 1002. Y notar que los va liberando ordenadamente.
-
-
+ 
+ 
 envid2env
 ---------
-
+ 
 1. en JOS, si un proceso llama a sys_env_destroy(0)
-
-si el envid es cero, llama a env_destroy(curenv), es decir, libera el proceso que esta corriendo actualmente.
-
+Si el envid es cero, llama a env_destroy(curenv), es decir, libera el proceso que esta corriendo actualmente.
+ 
 2. en Linux, si un proceso llama a kill(0, 9)
-
-si el pid es cero, envia la señal (9) a todo proceso dentro del grupo de procesos que se encuentra el actual. La señal 9 indica claramente que debe quitarse.
-
+Si el pid es cero, envia la señal (9) a todo proceso dentro del grupo de procesos que se encuentra el actual. La señal 9 indica claramente que debe quitarse.
+ 
 3. JOS: sys_env_destroy(-1)
-
-TO DO: estoy 93% seguro.
-deberia indicar error, ya que los envid son todos positivos, excepto el 0(caso especial) que vimos en el punto anterior.
-(si le paso a envid2env(-1, ...), la macro ENVX(-1)).
-
+Indica error, ya que los envid son todos positivos, excepto el 0(caso especial) que vimos en el punto anterior.
+(si le paso a envid2env(-1, ...), la macro ENVX(-1) indica error con parametros negativos.).
+ 
 4. Linux: kill(-1, 9)
-
-si el pid es -1, envia la señal (9) a todo proceso tal que el actual tenga permiso de enviarle señales.
+Si el pid es -1, envia la señal (9) a todo proceso tal que el actual tenga permiso de enviarle señales.
 
 
 dumbfork
@@ -98,21 +86,52 @@ dumbfork
 
 1. Si, antes de llamar a dumbfork(), el proceso se reserva a sí mismo una página con sys_page_alloc() ¿se propagará una copia al proceso hijo? ¿Por qué?
 
-TO DO:
+Sí, ya que la nueva página reservada es parte del address space del padre, por lo cual se copiará
+al hijo como cualquier otra dirección que esté mapeada.
 
 2. ¿Se preserva el estado de solo-lectura en las páginas copiadas? Mostrar, con código en espacio de usuario, cómo saber si una dirección de memoria es modificable por el proceso, o no. (Ayuda: usar las variables globales uvpd y/o uvpt.)
 
-TO DO:   
+No, no se preserva el estado de solo-lectura en las páginas copiadas, ya que la función duppage
+no recibe permisos como parámetros, sino que le pasa siempre tres flags fijos tanto a sys_page_alloc como a sys_page_map. En particular, estos flags son PTE_P | PTE_U | PTE_W. Éste último es, justamente, el que marca como writeable a todas las páginas copiadas.
+
+Código en user-space para saber si una dirección de memoria es modificable por el proceso, o no:
+
+for (va=0; va<UTOP; va+=PGSIZE){
+		// Obtengo la direccion del page directory entry
+		pde_t actual_pde = uvpd[PDX(va)];
+		// Si tiene el bit de presencia --> hay una pagina mapeada
+		is_maped = (actual_pde == (actual_pde | PTE_P));
+
+		if (is_maped) {
+			// Obtengo la direccion del page table entry
+			pte_t actual_pte = uvpt[PGNUM(va)];
+			// Si tiene el bit de escritura --> es modificable
+			is_writeable = (actual_pte == (actual_pte | PTE_W));
+		}
+}
 
 3. Describir el funcionamiento de la función duppage().
 Esta funcion recibe el numero de id y una direccion virtual donde, primero se va a alocar una pagina y luego la mapea segun el addr con los permisos de escritura y de user en una region temporaria ya que la funcion para mapear necesita 2 ids y direcciones. Luego con memmove() la mueve de la region temporaria a la addr. Por ultimo saca de esa region temporaria(UTEMP) lo que aloco, asi se libera.
 
 
- Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo:
-4. indicar qué llamada adicional se debería hacer si el booleano es true
-Crear una variable: perm = (PTE_P|PTE_U|PTE_W) y si el booleano es true, cambiar sacando el PTE_W de los permisos.
-TO DO: o habria que llamar a una funcion?
+4. Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo. Indicar qué llamada adicional se debería hacer si el booleano es true
 
+Supongamos que la firma de duppage ahora es:
+
+duppage(envid_t dstenv, void *addr, bool read_only);
+
+En este caso, bastaría con chequear el parámetro booleano para saber si los permisos deben modificarse o no. Por ejemplo:
+
+duppage(envid_t dstenv, void *addr, bool read_only) {
+	int perm;
+	if (read_only) {
+		perm = PTE_P | PTE_U;
+	} else {
+		perm = PTE_P | PTE_U | PTE_W;
+	}
+}
+
+De esta forma, se puede ver que si el booleano es True, la página se copiará sin permisos de escritura.
 
 5. describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
 

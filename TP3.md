@@ -1,29 +1,36 @@
-TP3: Multitarea con desalojo
+TP3: Multitarea con desalojo :shipit:
 ========================
 
 static_assert
 ---------
 
 1. ¿Cómo y por qué funciona la macro static_assert que define JOS?
+
 Para la evaluacion(comparacion) se le deben pasar consatntes (que no cambien a lo largo de la ejecucion del programa), por eso este assert hace la comparacion en tiempo de compilacion.
+TO DO: como el static_assert se compone de un switch-case. si el valor que recibe es un cero...
 
 
 env_return
 ---------
 
 1. al terminar un proceso su función umain() ¿dónde retoma la ejecución el kernel? Describir la secuencia de llamadas desde que termina umain() hasta que el kernel dispone del proceso.
+
 TODO: no se si habla en general la funcion umain().
 
 2. ¿en qué cambia la función env_destroy() en este TP, respecto al TP anterior?
+
 Ahora env_destroy(e) primero detecta si el env a eliminar esta corriendo en otro CPU, en este caso le cambia el estado para que la proxima vez el Kernel lo detecte, lo libere. Sino lo destruye, se fija si esta el env actual corriendo y en este caso llama a sched_yield() para detectar el proximo env a ejecutar (usando round robin).
 
 
 sys_yield
 ---------
 
-1. TODO ni idea lo que hay que hacer.
+1. 
+
+TODO ni idea lo que hay que hacer.
 
 2. 
+
 " $ make qemu-nox
 + cc kern/init.c
 + ld obj/kern/kernel
@@ -68,17 +75,21 @@ envid2env
 ---------
 
 1. en JOS, si un proceso llama a sys_env_destroy(0)
+
 si el envid es cero, llama a env_destroy(curenv), es decir, libera el proceso que esta corriendo actualmente.
 
 2. en Linux, si un proceso llama a kill(0, 9)
+
 si el pid es cero, envia la señal (9) a todo proceso dentro del grupo de procesos que se encuentra el actual. La señal 9 indica claramente que debe quitarse.
 
 3. JOS: sys_env_destroy(-1)
+
 TO DO: estoy 93% seguro.
 deberia indicar error, ya que los envid son todos positivos, excepto el 0(caso especial) que vimos en el punto anterior.
 (si le paso a envid2env(-1, ...), la macro ENVX(-1)).
 
 4. Linux: kill(-1, 9)
+
 si el pid es -1, envia la señal (9) a todo proceso tal que el actual tenga permiso de enviarle señales.
 
 
@@ -86,25 +97,31 @@ dumbfork
 ---------
 
 1. Si, antes de llamar a dumbfork(), el proceso se reserva a sí mismo una página con sys_page_alloc() ¿se propagará una copia al proceso hijo? ¿Por qué?
+
 TO DO:
 
 2. ¿Se preserva el estado de solo-lectura en las páginas copiadas? Mostrar, con código en espacio de usuario, cómo saber si una dirección de memoria es modificable por el proceso, o no. (Ayuda: usar las variables globales uvpd y/o uvpt.)
-TO DO: ver las variables uvpd y uvpt
+
+TO DO:   
 
 3. Describir el funcionamiento de la función duppage().
 Esta funcion recibe el numero de id y una direccion virtual donde, primero se va a alocar una pagina y luego la mapea segun el addr con los permisos de escritura y de user en una region temporaria ya que la funcion para mapear necesita 2 ids y direcciones. Luego con memmove() la mueve de la region temporaria a la addr. Por ultimo saca de esa region temporaria(UTEMP) lo que aloco, asi se libera.
+
 
  Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo:
 4. indicar qué llamada adicional se debería hacer si el booleano es true
 Crear una variable: perm = (PTE_P|PTE_U|PTE_W) y si el booleano es true, cambiar sacando el PTE_W de los permisos.
 TO DO: o habria que llamar a una funcion?
 
+
 5. describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
+
 TO DO:
 
 6. ¿Por qué se usa ROUNDDOWN(&addr) para copiar el stack? ¿Qué es addr y por qué, si el stack crece hacia abajo, se usa ROUNDDOWN y no ROUNDUP?
-Para alinear la direccion con PGSIZE. addr es la direccion que queda despues de copiar el address space en el hijo (despues del for). Justamente se usa ROUNDDOWN ya que sino pisaria otro address space, cuando tiene que compartir el espacio con el heap.
 
+Para alinear la direccion con PGSIZE. addr es la direccion que queda despues de copiar el address space en el hijo (despues del for).
+TO DO: es para alinear la direccion tal que quede en la posicion del stack, asi lo copio.
 
 multicore_init
 ---------

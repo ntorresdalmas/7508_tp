@@ -2,29 +2,34 @@
 ========================
  
 -------------
-static_assert
+:clubs: static_assert
  
 1. ¿Cómo y por qué funciona la macro static_assert que define JOS?
-Para la evaluacion(comparacion) se le deben pasar constantes (que no cambien a lo largo de la ejecucion del programa), por eso este assert hace la comparacion en tiempo de compilacion. Esto es ya que esta definida la macro con un switch(x) case 0: case(x)
-y si x es 0(false), siempre cae en case 0 y produce un error en tiempo de compilacion.
+
+Para la evaluación (comparación) se le deben pasar constantes (que no cambien a lo largo de la ejecución del programa). Por ello, este assert hace la comparación en tiempo de compilación.
+Esto es así ya que esta definida la macro con un switch(x) case 0: case(x)
+Si x es 0 (False), siempre cae en case 0 y produce un error en tiempo de compilación.
  
  
 ----------
-env_return
+:clubs: env_return
  
-1. al terminar un proceso su función umain() ¿dónde retoma la ejecución el kernel? Describir la secuencia de llamadas desde que termina umain() hasta que el kernel dispone del proceso.
-TODO:
+1. Al terminar un proceso su función umain() ¿dónde retoma la ejecución el kernel? Describir la secuencia de llamadas desde que termina umain() hasta que el kernel dispone del proceso.
+
+:construction:
  
-2. ¿en qué cambia la función env_destroy() en este TP, respecto al TP anterior?
-Ahora env_destroy(e) primero detecta si el env a eliminar esta corriendo en otro CPU, en este caso le cambia el estado para que la proxima vez el Kernel lo detecte, lo libere. Sino lo destruye, se fija si esta el env actual corriendo y en este caso llama a sched_yield() para detectar el proximo env a ejecutar (usando round robin).
- 
+2. ¿En qué cambia la función env_destroy() en este TP, respecto al TP anterior?
+La nueva versión de env_destroy(e) primero detecta si el env a eliminar está corriendo en otro CPU, en cuyo caso le cambia el estado para que la próxima vez el Kernel lo detecte y lo libere.
+Caso contrario lo destruye, se fija si está el env actual corriendo y llama a sched_yield() para detectar el próximo env a ejecutar (mediante Round Robin).
+
  
 ---------
-sys_yield
+:clubs: sys_yield
  
 2. Leer y estudiar el código del programa user/yield.c. Cambiar la función i386_init() para lanzar tres instancias de dicho programa, y mostrar y explicar la salida de make qemu-nox.
- 
-" $ make qemu-nox
+
+"" 
+$ make qemu-nox
 + cc kern/init.c
 + ld obj/kern/kernel
 + mk obj/kern/kernel.img
@@ -60,29 +65,36 @@ i am environment 00001002
 No runnable environments in the system!
 Welcome to the JOS kernel monitor!
 Type 'help' for a list of commands.
-K> "
-Como se llama 3 veces a ENV_CREATE(), tenemos los enviorments 1000, 1001 y 1002. Y notar que los va liberando ordenadamente.
+K>
+""
+
+Considerando que se llama 3 veces a ENV_CREATE(), tenemos los environments 1000, 1001 y 1002.
+Notar que los va liberando de manera ordenada.
  
  
 ---------
-envid2env
+:clubs: envid2env
  
-1. en JOS, si un proceso llama a sys_env_destroy(0)
-Si el envid es cero, llama a env_destroy(curenv), es decir, libera el proceso que esta corriendo actualmente.
+1. En JOS, si un proceso llama a sys_env_destroy(0)
+
+Si el envid es cero, llama a env_destroy(curenv). Es decir, libera el proceso que está corriendo actualmente.
  
-2. en Linux, si un proceso llama a kill(0, 9)
-Si el pid es cero, envia la señal (9) a todo proceso dentro del grupo de procesos que se encuentra el actual. La señal 9 indica claramente que debe quitarse.
+2. En Linux, si un proceso llama a kill(0, 9)
+
+Si el pid es cero, envía la señal (9) a todo proceso dentro del grupo de procesos que se encuentra el actual. La señal 9 indica claramente que debe quitarse.
  
 3. JOS: sys_env_destroy(-1)
-Indica error, ya que los envid son todos positivos, excepto el 0(caso especial) que vimos en el punto anterior.
-(si le paso a envid2env(-1, ...), la macro ENVX(-1) indica error con parametros negativos.).
+
+Indica error, ya que los envid son todos positivos, excepto el 0 (caso especial) que se mencionó en el punto anterior.
+De hecho, si se hace envid2env(-1, ...), la macro ENVX(-1) indica error con parámetros negativos.
  
 4. Linux: kill(-1, 9)
+
 Si el pid es -1, envia la señal (9) a todo proceso tal que el actual tenga permiso de enviarle señales.
 
 
 --------
-dumbfork
+:clubs: dumbfork
 
 1. Si, antes de llamar a dumbfork(), el proceso se reserva a sí mismo una página con sys_page_alloc() ¿se propagará una copia al proceso hijo? ¿Por qué?
 
@@ -111,10 +123,14 @@ for (va=0; va<UTOP; va+=PGSIZE){
 }
 
 3. Describir el funcionamiento de la función duppage().
-Esta funcion recibe el numero de id y una direccion virtual donde, primero se va a alocar una pagina y luego la mapea segun el addr con los permisos de escritura y de user en una region temporaria ya que la funcion para mapear necesita 2 ids y direcciones. Luego con memmove() la mueve de la region temporaria a la addr. Por ultimo saca de esa region temporaria(UTEMP) lo que aloco, asi se libera.
+
+Primero, aloca una página en la dirección recibida con los permisos PTE_U | PTE_P | PTE_W
+Segundo, comparte la página alocada con una dirección temporal (UTEMP)
+Tercero, mueve el contenido de la dirección temporal a la dirección recibida
+Cuarto, libera la dirección temporal alocada.
 
 
-4. Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo. Indicar qué llamada adicional se debería hacer si el booleano es true
+4. Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo. Indicar qué llamada adicional se debería hacer si el booleano es true.
 
 Supongamos que la firma de duppage ahora es:
 
@@ -131,9 +147,9 @@ duppage(envid_t dstenv, void *addr, bool read_only) {
 	}
 }
 
-De esta forma, se puede ver que si el booleano es True, la página se copiará sin permisos de escritura.
+De esta forma, se puede ver que, si el booleano es true, la página se copiará sin permisos de escritura (read-only).
 
-5. describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
+5. Describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).
 
 El algoritmo descripto en el punto 4 cumple con este requisito.
 
@@ -144,7 +160,7 @@ Por otro lado, se utiliza ROUNDDOWN porque justamente nos interesa mapear el pri
 
 
 --------------
-multicore_init
+:clubs: multicore_init
 
 1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?
 memmove(code, mpentry_start, mpentry_end - mpentry_start);
@@ -172,7 +188,7 @@ movl $(RELOC(entry_pgdir)), %eax"
 
 
 -------
-ipc_rev
+:clubs: ipc_rev
 
 1. Un proceso podría intentar enviar el valor númerico -E_INVAL vía ipc_send(). ¿Cómo es posible distinguir si es un error, o no? En estos casos:
 
@@ -205,10 +221,13 @@ En cambio, para la versión B no hay forma de detectar si se trata de un valor o
 
 
 ----------------
-sys_ipc_try_send
+:clubs: sys_ipc_try_send
 
-1.
+1. ¿Cómo se podría hacer bloqueante esta llamada? Esto es: qué estrategia de implementación se podría usar para que, si un proceso A intenta enviar a B, pero B no está esperando un mensaje, el proceso A sea puesto en estado ENV_NOT_RUNNABLE, y sea despertado una vez B llame a ipc_recv().
 
-2.
+Podría modificarse la condición que comprueba si el proceso destino está esperando o no un mensaje:
 
-3.
+if (!e->env_ipc_recving) {
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	sys_yield();
+}

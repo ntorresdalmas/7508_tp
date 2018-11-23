@@ -30,7 +30,7 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	if (pg) {
 		dstva = (uintptr_t) pg;
 	} else {
-		dstva = -E_INVAL;
+		dstva = UTOP;
 	}
 	// Guardo el envid del emisor
 	if (from_env_store) {
@@ -67,22 +67,22 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 	// panic("ipc_send not implemented");
 
 	// Guardo la pagina enviada por el emisor
-	uintptr_t dstva;
+	uintptr_t srcva;
 	if (pg) {
-		dstva = (uintptr_t) pg;
+		srcva = (uintptr_t) pg;
 	} else {
-		dstva = -E_INVAL;
+		srcva = UTOP;
 	}
 	// Intento enviar el mensaje hasta lograrlo
 	int r;
 	bool message_sent = 0;
 	while (!message_sent) {
 		// Llamo a la syscall
-		if ((r = sys_ipc_try_send(to_env, val, (void *) dstva, perm) < 0)) {
+		if ((r = sys_ipc_try_send(to_env, val, (void *) srcva, perm) < 0)) {
 			if (r==-E_IPC_NOT_RECV) {
 				sys_yield();
 			} else {
-				panic("Error inesperado");
+				panic("ipc_send error: %e", r);
 			}
 		} else {
 			message_sent = 1;

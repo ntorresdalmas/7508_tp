@@ -251,7 +251,7 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	// Obtengo los env asociados a los envid
 	struct Env *src_env;
 	struct Env *dst_env;	
-	if ((envid2env(srcenvid, &src_env, 1) < 0) || (envid2env(dstenvid, &dst_env, 1) < 0)) {
+	if ((envid2env(srcenvid, &src_env, 0) < 0) || (envid2env(dstenvid, &dst_env, 0) < 0)) {
 		return -E_BAD_ENV;
 	}
 	// Chequeo la va y los permisos
@@ -365,28 +365,6 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	if (!e->env_ipc_recving) {
 		return -E_IPC_NOT_RECV;
 	}
-	/*
-	// Chequeo que srcva este alineada
-	if (((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE != 0)) {
-		return -E_INVAL;
-	}
-	// Chequeo los permisos
-	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
-	if (((uintptr_t) srcva < UTOP) && (!perm_ok)) {
-		return -E_INVAL;
-	}
-	// Chequeo que srcva este mapeada en el address space de curenv (caller)
-	pte_t *pgtab_entry;
-	struct PageInfo *src_page = page_lookup(curenv->env_pgdir, srcva, &pgtab_entry);
-	if (((uintptr_t) srcva < UTOP) && (!src_page)) {
-		return -E_INVAL;
-	}
-	// Chequeo que el proceso no quiera mapear una pagina con PTE_W en una pagina sin PTE_W
-	bool not_writeable = (perm == (perm | PTE_W)) && !(*pgtab_entry == (*pgtab_entry | PTE_W));
-	if (not_writeable) {
-		return -E_INVAL;
-	}
-	*/
 	// Comparto la pagina entre el caller y el receiver si srcva < UTOP y dstva < UTOP
 	bool map_page = 0;
 	if (((uintptr_t) srcva < UTOP) && ((uintptr_t) e->env_ipc_dstva < UTOP)) {

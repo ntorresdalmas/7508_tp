@@ -236,7 +236,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 //		address space.
 //	-E_NO_MEM if there's no memory to allocate any necessary page tables.
 static int
-sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int perm)
+sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int perm, int checkperm)
 {
 	// Hint: This function is a wrapper around page_lookup() and
 	//   page_insert() from kern/pmap.c.
@@ -251,7 +251,9 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	// Obtengo los env asociados a los envid
 	struct Env *src_env;
 	struct Env *dst_env;	
-	if ((envid2env(srcenvid, &src_env, 0) < 0) || (envid2env(dstenvid, &dst_env, 0) < 0)) {
+	// TODO: esto no siempre es 0, hay que agregarle un parametro a sys_page_map
+	if ((envid2env(srcenvid, &src_env, checkperm) < 0) ||
+		(envid2env(dstenvid, &dst_env, checkperm) < 0)) {
 		return -E_BAD_ENV;
 	}
 	// Chequeo la va y los permisos
@@ -368,7 +370,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	// Comparto la pagina entre el caller y el receiver si srcva < UTOP y dstva < UTOP
 	bool map_page = 0;
 	if (((uintptr_t) srcva < UTOP) && ((uintptr_t) e->env_ipc_dstva < UTOP)) {
-		if ((r = sys_page_map(curenv->env_id, srcva, envid, e->env_ipc_dstva, perm)) < 0) {
+		if ((r = sys_page_map(curenv->env_id, srcva, envid, e->env_ipc_dstva, perm, 0)) < 0) {
 			return r;
 		} else {
 			map_page = 1;
@@ -442,7 +444,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		case SYS_page_alloc:
 			return sys_page_alloc((envid_t) a1, (void *) a2, (int) a3);
 		case SYS_page_map:
-			return sys_page_map((envid_t) a1, (void *) a2, (envid_t) a3, (void *) a4, (int) a5);
+			return sys_page_map((envid_t) a1, (void *) a2, (envid_t) a3, (void *) a4, (int) a5, 1);
 		case SYS_page_unmap:
 			return sys_page_unmap((envid_t) a1, (void *) a2);
 		case SYS_env_set_status:

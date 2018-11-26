@@ -29,8 +29,13 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 	if (_pgfault_handler == 0) {
 		// First time through!
 		// LAB 4: Your code here.
-		panic("set_pgfault_handler not implemented");
+		//panic("set_pgfault_handler not implemented");
+
+		//TO DO: es el unico perm que esta en el lib.h
+		sys_page_alloc(thisenv->env_id, (void*)UXSTACKTOP, PTE_SHARE);
 	}
+	//TO DO: no se si va adentro del if.
+	_pgfault_upcall();
 
 	// Save handler pointer for assembly to call.
 	_pgfault_handler = handler;

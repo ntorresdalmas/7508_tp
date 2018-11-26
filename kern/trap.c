@@ -422,7 +422,23 @@ page_fault_handler(struct Trapframe *tf)
 	if (curenv->env_pgfault_upcall){
 		struct UTrapframe *u;
 
+		// chequeo si tien permisos para acceder a esa memoria, sino destruye 
+		// el curenv y puede que no retorne.
+		// TO DO: por eso dice que es recursivo? no se que permisos pasarle.
+		user_mem_assert(curenv, (const void*) UXSTACKTOP, PGSIZE, PTE_SHARE);
+
+		/*
+		u->utf_fault_va =  	;
 		
+		u->utf_err = ;
+
+		u->utf_regs  ;
+		u->utf_eflags = ;
+
+		u->utf_eip = ;
+		u->utf_esp = ;
+		*/
+
 
 		env_run();
 	}

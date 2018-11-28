@@ -66,7 +66,6 @@ _pgfault_upcall:
 	//
 	// LAB 4: Your code here.
 	
-	// TODO: rearmar esto
 	movl 40(%esp), %eax
 	movl 48(%esp), %ebx
 	subl $4, %ebx
@@ -85,7 +84,6 @@ _pgfault_upcall:
 	// modifies eflags.
 	// LAB 4: Your code here.
 
-	// TODO: rearmar esto
 	addl $4, %esp
 	popfl
 

@@ -432,7 +432,8 @@ page_fault_handler(struct Trapframe *tf)
 		uintptr_t ustack_bottom = ustack_top - sizeof(struct UTrapframe);
 
 		// Chequeo que el curenv tiene permitido acceder al espacio de memoria
-		user_mem_assert(curenv, (const void*) ustack_bottom, ustack_top, PTE_U | PTE_W);
+		user_mem_assert(curenv, (const void*) ustack_bottom,
+						sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
 
 		// Inicializo el UTrapframe en la direccion correspondiente
 		utrap = (struct UTrapframe *) ustack_bottom;
@@ -442,7 +443,6 @@ page_fault_handler(struct Trapframe *tf)
 		utrap->utf_err = tf->tf_err;
 		utrap->utf_regs = tf->tf_regs;
 		utrap->utf_eflags = tf->tf_eflags;
-		// TODO: ver si estos dos van
 		utrap->utf_eip = tf->tf_eip;
 		utrap->utf_esp = tf->tf_esp;
 		

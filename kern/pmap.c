@@ -791,7 +791,9 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
 		// Obtengo la pagina actual del pgdir del proceso
 		pte_t *actual_page = pgdir_walk(env->env_pgdir, (const void *) i, 0);
-		
+		if (!actual_page) {
+			return -E_FAULT;
+		}
 		// Las siguientes condiciones me indican acceso a memoria valida:
 		// (1) va < ULIM
 		bool ulim_va = i < ULIM;
@@ -799,7 +801,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 		bool perm_ok = (*actual_page & perm) == perm;
 		
 		// Si la va no es accesible, me guardo la primera va erronea y devuelvo
-		bool allowed_va = ulim_va && perm_ok;
+		bool allowed_va = ulim_va && perm_ok && actual_page;
 		if (!allowed_va) {
 			// Si la va recibida es menor a PGSIZE, me guardo va pp dicha
 			// ya que ROUNDDOWN me devuelve un valor incorrecto

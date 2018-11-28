@@ -250,8 +250,7 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 
 	// Obtengo los env asociados a los envid
 	struct Env *src_env;
-	struct Env *dst_env;	
-	// TODO: esto no siempre es 0, hay que agregarle un parametro a sys_page_map
+	struct Env *dst_env;
 	if ((envid2env(srcenvid, &src_env, checkperm) < 0) ||
 		(envid2env(dstenvid, &dst_env, checkperm) < 0)) {
 		return -E_BAD_ENV;

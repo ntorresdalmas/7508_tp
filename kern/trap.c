@@ -381,8 +381,7 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-	// Panic si el page fault ocurre en modo kernel
-	if ((tf->tf_cs & 3) == 0) {
+	if ((tf->tf_cs & 3) != 3) {
 		panic("Page Fault ocurrio en modo kernel");
 	}
 
@@ -420,34 +419,46 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 4: Your code here.
 
 	if (curenv->env_pgfault_upcall){
-		struct UTrapframe *u;
+		struct UTrapframe *utrap;
 
-		// chequeo si tien permisos para acceder a esa memoria, sino destruye 
-		// el curenv y puede que no retorne.
-		// TO DO: por eso dice que es recursivo? no se que permisos pasarle.
-		user_mem_assert(curenv, (const void*) UXSTACKTOP, PGSIZE, PTE_SHARE);
-
-		/*
-		u->utf_fault_va =  	;
+		// Caso recursivo:
+		// Si se cumple esta condicion, quiere decir que el page fault handler genero el fault
+		bool tf_in_xstack = (tf->tf_esp >= UXSTACKTOP - PGSIZE) && (tf->tf_esp < UXSTACKTOP);
 		
-		u->utf_err = ;
+		// Si tf_in_xstack --> el top del nuevo stack va debajo del que estaba corriendo
+		//					   esto seria = tf->tf_esp - 4 (por el word en blanco)
+		// Si no 		   --> el top del nuevo stack va en UXSTACKTOP
+		uintptr_t ustack_top = tf_in_xstack ? (tf->tf_esp - 4) : UXSTACKTOP;
+		uintptr_t ustack_bottom = ustack_top - sizeof(struct UTrapframe);
 
-		u->utf_regs  ;
-		u->utf_eflags = ;
+		// Chequeo que el curenv tiene permitido acceder al espacio de memoria
+		user_mem_assert(curenv, (const void*) ustack_bottom, ustack_top, PTE_U | PTE_W);
 
-		u->utf_eip = ;
-		u->utf_esp = ;
-		*/
+		// Inicializo el UTrapframe en la direccion correspondiente
+		utrap = (struct UTrapframe *) ustack_bottom;
 
-
-		env_run();
+		// Completo el UTrapframe, copiando desde 'tf'
+		utrap->utf_fault_va = fault_va;
+		utrap->utf_err = tf->tf_err;
+		utrap->utf_regs = tf->tf_regs;
+		utrap->utf_eflags = tf->tf_eflags;
+		// TODO: ver si estos dos van
+		utrap->utf_eip = tf->tf_eip;
+		utrap->utf_esp = tf->tf_esp;
+		
+		// Cambio a donde se va a ejecutar el proceso
+		tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+		tf->tf_esp = (uintptr_t) utrap;
+		
+		// Ejecuto el curenv segun el nuevo eip y esp
+		env_run(curenv);
+	} else {
+	// Destruyo el proceso que ocasiono el fault
+		cprintf("[%08x] user fault va %08x ip %08x\n",
+		        curenv->env_id,
+		        fault_va,
+		        tf->tf_eip);
+		print_trapframe(tf);
+		env_destroy(curenv);		
 	}
-
-	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-	        curenv->env_id,
-	        fault_va,
-	        tf->tf_eip);
-	print_trapframe(tf);
-	env_destroy(curenv);
 }

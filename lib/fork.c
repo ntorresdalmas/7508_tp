@@ -56,7 +56,7 @@ pgfault(struct UTrapframe *utf)
 		panic("sys_page_map: %e", r);
 	}
 	memmove(UTEMP, addr, PGSIZE);
-	if ((r = sys_page_unmap(0, UTEMP)) < 0) {
+	if ((r = sys_page_unmap(0, PFTEMP)) < 0) {
 		panic("sys_page_unmap: %e", r);
 	}
 }
@@ -81,24 +81,30 @@ duppage(envid_t envid, unsigned pn)
 	// Obtengo la va de la pagina pn
 	uintptr_t va = (uintptr_t) pn * PGSIZE;
 
-	// Compruebo permisos de la pagina pn
-	pte_t actual_pte = uvpt[pn];	
+	// Obtengo la pagina pp dicha
+	pte_t actual_pte = uvpt[pn];
+	
+	// Inicialmente los permisos del hijo son heredados del padre
+	int child_perm = actual_pte;
+	
+	// Si el padre tiene activado PTE_W, se lo desactivo al hijo
+	// y a su vez le activo el PTE_COW
 	bool is_writeable = (actual_pte == (actual_pte | PTE_W));
-	bool is_cow = (actual_pte == (actual_pte | PTE_COW));
-
-	// Si es writeable o copy-on-write, el nuevo mapeo incluye PTE_COW
-	int perm = (is_writeable || is_cow) ? (actual_pte | PTE_COW) : actual_pte;
-
+	if (is_writeable) {
+		child_perm |= !PTE_W;
+		child_perm |= PTE_COW;
+	}
 	// Mapeo en el hijo la pagina fisica en la misma va
 	int r;
-	if ((r = sys_page_map(envid, (void *) va, 0, (void *) va, perm)) < 0) {
+	if ((r = sys_page_map(envid, (void *) va, 0, (void *) va, child_perm)) < 0) {
 		panic("sys_page_map: %e", r);
 	}
-	// Si los permisos del hijo incluyen PTE_COW, hago lo propio con la pagina pn
-	if (perm == (perm | PTE_COW)) {
+	// Si los permisos resultantes del hijo incluyen PTE_COW, se lo activo tambien al padre
+	// y a su vez le desactivo el PTE_W
+	if (child_perm == (child_perm | PTE_COW)) {
+		actual_pte |= !PTE_W;
 		actual_pte |= PTE_COW;
 	}
-
 	return 0;
 }
 
@@ -130,7 +136,7 @@ dup_or_share(envid_t dstenv, void *va, int perm)
 envid_t
 fork_v0(void)
 {
-	// Aloco un nuevo proceso
+	// Creo un nuevo proceso
 	envid_t envid;
 	envid = sys_exofork();
 
@@ -193,9 +199,13 @@ fork(void)
 	// LAB 4: Your code here.
 	//panic("fork not implemented");
 	
-	return fork_v0();
+	//return fork_v0();
 
-	// Aloco un nuevo proceso
+	// Instalo en el padre la funcion 'pgfault' como handler de page faults
+	// Tambien reservo memoria para su UXSTACK
+	set_pgfault_handler(pgfault);
+
+	// Creo un nuevo proceso
 	envid_t envid;
 	envid = sys_exofork();
 
@@ -209,18 +219,12 @@ fork(void)
 
 		// Instalo en el hijo el handler de excepciones
 		// Tambien reservo memoria para su UXSTACK
-		// TODO: ver cual es el parametro (handler) 
+		// TODO: ver si es correcta esta llamada 
 		set_pgfault_handler(pgfault);
 
 		return 0;
 	}
 	// Es el proceso padre
-
-	// Instalo en el padre la funcion 'pgfault' como handler de page faults
-	// Tambien reservo memoria para su UXSTACK
-	// TODO: ver si esto va aca o antes del sys_exofork
-	set_pgfault_handler(pgfault);
-	
 	bool is_maped;
 	bool va_in_xstack;
 	int va;

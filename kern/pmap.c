@@ -791,22 +791,22 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
 		// Obtengo la pagina actual del pgdir del proceso
 		pte_t *actual_page = pgdir_walk(env->env_pgdir, (const void *) i, 0);
-		if (!actual_page) {
-			return -E_FAULT;
-		}
+
 		// Las siguientes condiciones me indican acceso a memoria valida:
+		// (0) existe actual page
+		bool page_ok = actual_page;
 		// (1) va < ULIM
 		bool ulim_va = i < ULIM;
 		// (2) permisos aceptados por la page table
-		bool perm_ok = (*actual_page & perm) == perm;
+		bool perm_ok = ((*actual_page & perm) == perm);
 		
 		// Si la va no es accesible, me guardo la primera va erronea y devuelvo
-		bool allowed_va = ulim_va && perm_ok && actual_page;
+		bool allowed_va = page_ok && ulim_va && perm_ok;
+		
 		if (!allowed_va) {
-			// Si la va recibida es menor a PGSIZE, me guardo va pp dicha
-			// ya que ROUNDDOWN me devuelve un valor incorrecto
-			bool va_lower_than_pgsize = (size_t) va < PGSIZE;
-			user_mem_check_addr = va_lower_than_pgsize ? (size_t) va : i;
+			// Si i < va --> me guardo va
+			bool i_lower_than_va = i < (size_t) va;
+			user_mem_check_addr = i_lower_than_va ? (size_t) va : i;
 			return -E_FAULT;
 		}
 	}

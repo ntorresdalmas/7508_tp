@@ -199,7 +199,7 @@ fork(void)
 	// LAB 4: Your code here.
 	//panic("fork not implemented");
 	
-	//return fork_v0();
+	return fork_v0();
 
 	// Instalo en el padre la funcion 'pgfault' como handler de page faults
 	// Tambien reservo memoria para su UXSTACK

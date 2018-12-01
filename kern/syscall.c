@@ -200,7 +200,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	// Chequeo que (PTE_U | PTE_P) pertenezcan a perm
 	// Y que perm pertenezca a PTE_SYSCALL.
-	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+	bool perm_ok = (perm & (PTE_U | PTE_P)) && (PTE_SYSCALL & perm);
 
 	if ((!va_ok) || (!perm_ok)) {
 		return -E_INVAL;
@@ -258,7 +258,8 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	// Chequeo la va y los permisos
 	bool srcva_ok = ((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE == 0);
 	bool dstva_ok = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);
-	bool perm_ok = (perm == (perm | (PTE_U | PTE_P))) && (PTE_SYSCALL == (perm | PTE_SYSCALL));
+	bool perm_ok = (perm & (PTE_U | PTE_P)) && (PTE_SYSCALL & perm);
+
 	if ((!srcva_ok) || (!dstva_ok) || (!perm_ok)) {
 		return -E_INVAL;
 	}
@@ -271,7 +272,7 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 		return -E_INVAL;
 	}
 	// Chequeo que el proceso no quiera mapear una pagina con PTE_W en una pagina sin PTE_W
-	bool not_writeable = (perm == (perm | PTE_W)) && !(*pgtab_entry == (*pgtab_entry | PTE_W));
+	bool not_writeable = (perm & PTE_W) && !(*pgtab_entry & PTE_W);
 	if (not_writeable) {
 		return -E_INVAL;
 	}

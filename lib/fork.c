@@ -89,9 +89,9 @@ duppage(envid_t envid, unsigned pn)
 	
 	// Si el padre tiene activado PTE_W, se lo desactivo al hijo
 	// y a su vez le activo el PTE_COW
-	bool is_writeable = (actual_pte == (actual_pte | PTE_W));
+	bool is_writeable = (actual_pte & PTE_W);
 	if (is_writeable) {
-		child_perm |= !PTE_W;
+		child_perm &= ~PTE_W;
 		child_perm |= PTE_COW;
 	}
 	// Mapeo en el hijo la pagina fisica en la misma va
@@ -101,8 +101,8 @@ duppage(envid_t envid, unsigned pn)
 	}
 	// Si los permisos resultantes del hijo incluyen PTE_COW, se lo activo tambien al padre
 	// y a su vez le desactivo el PTE_W
-	if (child_perm == (child_perm | PTE_COW)) {
-		actual_pte |= !PTE_W;
+	if (child_perm & PTE_COW) {
+		actual_pte &= ~PTE_W;
 		actual_pte |= PTE_COW;
 	}
 	return 0;
@@ -112,7 +112,7 @@ static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
 	int r;
-	bool not_writeable = !(perm == (perm | PTE_W));
+	bool not_writeable = !(perm & PTE_W);
 	// Si la pagina es de solo lectura, la comparto con el hijo
 	if (not_writeable) {
 		if ((r = sys_page_map(0, va, dstenv, va, perm)) < 0) {
@@ -156,13 +156,13 @@ fork_v0(void)
 		// Obtengo la direccion del page directory entry
 		pde_t actual_pde = uvpd[PDX(va)];
 		// Si tiene el bit de presencia --> hay una pagina mapeada
-		is_maped = (actual_pde == (actual_pde | PTE_P));
+		is_maped = (actual_pde & PTE_P);
 
 		if (is_maped) {
 			// Obtengo la direccion del page table entry
 			pte_t actual_pte = uvpt[PGNUM(va)];
 			// Si tiene el bit de presencia --> hay una pagina mapeada
-			is_maped = (actual_pte == (actual_pte | PTE_P));
+			is_maped = (actual_pte & PTE_P);
 			// Si hay pagina mapeada, la comparto con el hijo
 			if (is_maped) {
 				dup_or_share(envid, (void *) va, actual_pte | PTE_SYSCALL);
@@ -198,8 +198,8 @@ fork(void)
 {
 	// LAB 4: Your code here.
 	//panic("fork not implemented");
-	
-	return fork_v0();
+
+	//return fork_v0();
 
 	// Instalo en el padre la funcion 'pgfault' como handler de page faults
 	// Tambien reservo memoria para su UXSTACK
@@ -228,6 +228,8 @@ fork(void)
 	bool is_maped;
 	bool va_in_xstack;
 	int va;
+	// TO DO: como dice recorrer la minima # de paginas, habria que hacer un chequeo previo y un while.
+
 	for (va=0; va<UTOP; va+=PGSIZE) {
 		// La region correspondiente a la pila de excepciones (UXSTACK) no se mapea
 		va_in_xstack = (va >= UXSTACKTOP - PGSIZE) && (va < UXSTACKTOP);
@@ -236,13 +238,13 @@ fork(void)
 			// Obtengo la direccion del page directory entry
 			pde_t actual_pde = uvpd[PDX(va)];
 			// Si tiene el bit de presencia --> hay una pagina mapeada
-			is_maped = (actual_pde == (actual_pde | PTE_P));
+			is_maped = (actual_pde & PTE_P);
 
 			if (is_maped) {
 				// Obtengo la direccion del page table entry
 				pte_t actual_pte = uvpt[PGNUM(va)];
 				// Si tiene el bit de presencia --> hay una pagina mapeada
-				is_maped = (actual_pte == (actual_pte | PTE_P));
+				is_maped = (actual_pte & PTE_P);
 				// Si hay pagina mapeada, la comparto con el hijo
 				if (is_maped) {
 					duppage(envid, PGNUM(va));

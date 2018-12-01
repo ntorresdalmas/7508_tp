@@ -55,7 +55,7 @@ pgfault(struct UTrapframe *utf)
 	if ((r = sys_page_map(thisenv->env_id, addr, 0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
 		panic("sys_page_map: %e", r);
 	}
-	memmove(UTEMP, addr, PGSIZE);
+	memmove(PFTEMP, addr, PGSIZE);
 	if ((r = sys_page_unmap(0, PFTEMP)) < 0) {
 		panic("sys_page_unmap: %e", r);
 	}
@@ -79,6 +79,9 @@ duppage(envid_t envid, unsigned pn)
 	//panic("duppage not implemented");
 	
 	// Obtengo la va de la pagina pn
+	// TODO: creo que aca esta el error
+	// el sys_page_map tira un panic porque page_lookup devuelve null cuando busca
+	// una pagina en srcva para el envid
 	uintptr_t va = (uintptr_t) pn * PGSIZE;
 
 	// Obtengo la pagina pp dicha
@@ -99,11 +102,9 @@ duppage(envid_t envid, unsigned pn)
 	if ((r = sys_page_map(envid, (void *) va, 0, (void *) va, child_perm)) < 0) {
 		panic("sys_page_map: %e", r);
 	}
-	// Si los permisos resultantes del hijo incluyen PTE_COW, se lo activo tambien al padre
-	// y a su vez le desactivo el PTE_W
+	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
 	if (child_perm & PTE_COW) {
-		actual_pte &= ~PTE_W;
-		actual_pte |= PTE_COW;
+		actual_pte = child_perm;
 	}
 	return 0;
 }
@@ -217,19 +218,22 @@ fork(void)
 		// Actualizo la variable thisenv ya que referencia al padre
 		thisenv = &envs[ENVX(sys_getenvid())];
 
-		// Instalo en el hijo el handler de excepciones
-		// Tambien reservo memoria para su UXSTACK
-		// TODO: ver si es correcta esta llamada 
-		set_pgfault_handler(pgfault);
-
 		return 0;
 	}
+	// Instalo en el hijo el handler de excepciones
+	// Tambien reservo memoria para su UXSTACK
+	int r;
+	if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
+		panic("sys_page_alloc: %e", r);
+	}
+	sys_env_set_pgfault_upcall(0, pgfault);
+
 	// Es el proceso padre
 	bool is_maped;
 	bool va_in_xstack;
 	int va;
-	// TO DO: como dice recorrer la minima # de paginas, habria que hacer un chequeo previo y un while.
-
+	
+	// TODO: optimizar este for para no recorrer paginas innecesarias
 	for (va=0; va<UTOP; va+=PGSIZE) {
 		// La region correspondiente a la pila de excepciones (UXSTACK) no se mapea
 		va_in_xstack = (va >= UXSTACKTOP - PGSIZE) && (va < UXSTACKTOP);
@@ -253,7 +257,6 @@ fork(void)
 		}
 	}
 	// Seteo el proceso hijo como ENV_RUNNABLE
-	int r;
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0) {
 		panic("sys_env_set_status: %e", r);
 	}

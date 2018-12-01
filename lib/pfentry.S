@@ -75,7 +75,7 @@ _pgfault_upcall:
 	// Cargo utf_flags en utf_esp
 	movl %ebx, 48(%esp)
 	// Muevo utf_eip a utf_eflags
-	mov %eax, %ebx
+	mov %eax, (%ebx)
 	// Cargo los regs en esp
 	addl $8, %esp
 

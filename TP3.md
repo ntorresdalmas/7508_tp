@@ -110,13 +110,13 @@ for (va=0; va<UTOP; va+=PGSIZE){
 		// Obtengo la direccion del page directory entry
 		pde_t actual_pde = uvpd[PDX(va)];
 		// Si tiene el bit de presencia --> hay una pagina mapeada
-		is_maped = (actual_pde == (actual_pde | PTE_P));
+		is_maped = (actual_pde & PTE_P);
 
 		if (is_maped) {
 			// Obtengo la direccion del page table entry
 			pte_t actual_pte = uvpt[PGNUM(va)];
 			// Si tiene el bit de escritura --> es modificable
-			is_writeable = (actual_pte == (actual_pte | PTE_W));
+			is_writeable = (actual_pte & PTE_W);
 		}
 }
 ```
@@ -308,3 +308,14 @@ if (!e->env_ipc_recving) {
 	sys_yield();
 }
 ```
+
+
+----------------
+:clubs: fork
+
+1. Reservar memoria para la pila de excepciones del hijo, e instalar su manejador de excepciones.
+¿Puede hacerse con la función set_pgfault_handler()? De no poderse, ¿cómo llega al hijo el valor correcto de la variable global _pgfault_handler?
+
+No, no puede utilizarse la función set_pgfault_handler(). Considerar que para este punto de la ejecución el padre ya va a haber configurado toda la memoria y, por lo tanto, la mencionada variable global _pgfault_handler_ no sería NULL. Ergo, nunca se reservaría la memoria para el UXSTACK del hijo ni se instalaría su manejador de excepciones. Y, como si fuera poco, la última línea que asigna el handler a _pgfault_handler_ generaría un page fault, porque la página que aloja dicha variable estaría marcada como copy-on-write.
+
+Para solucionar esto, se reserva una página para el UXSTACK del hijo con sys_page_alloc() y luego se le instala su manejador de excepciones, directamente con la syscall sys_env_set_pgfault_upcall(), cuyo manejador será pgfault. Estas dos operaciones deben realizarse luego de manejar el caso del hijo (envid==0) pero antes de copiar el address space del padre al hijo.

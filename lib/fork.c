@@ -27,8 +27,8 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 
-	// La direccion esta mapeada sii el bit FEC_PR esta en 1 (en addr)
-	bool maped_addr = ((uint32_t) addr & FEC_PR);
+	// La direccion esta mapeada sii el bit FEC_PR esta en 1 (en err)
+	bool maped_addr = (err & FEC_PR);
 	// El error ocurrio por una escritura sii el bit FEC_WR esta en 1 (en err)
 	bool is_write = (err & FEC_WR);
 	// La pagina mapeada esta marcada como copy-on-write
@@ -49,13 +49,18 @@ pgfault(struct UTrapframe *utf)
 	// LAB 4: Your code here.
 
 	int r;
-	if ((r = sys_page_alloc(thisenv->env_id, addr, PTE_P|PTE_U|PTE_W)) < 0) {
+	// Reservo una nueva pagina temporal
+	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
 			panic("sys_page_alloc: %e", r);
 	}
-	if ((r = sys_page_map(thisenv->env_id, addr, 0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
+	// Copio el contenido original a la nueva pagina temporal (addr --> PFTEMP)
+	memmove(PFTEMP, addr, PGSIZE);
+	
+	// Mapeo la nueva pagina temporal a la original
+	if ((r = sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
 		panic("sys_page_map: %e", r);
 	}
-	memmove(PFTEMP, addr, PGSIZE);
+	// Elimino la nueva pagina temporal
 	if ((r = sys_page_unmap(0, PFTEMP)) < 0) {
 		panic("sys_page_unmap: %e", r);
 	}
@@ -79,32 +84,35 @@ duppage(envid_t envid, unsigned pn)
 	//panic("duppage not implemented");
 	
 	// Obtengo la va de la pagina pn
-	// TODO: creo que aca esta el error
-	// el sys_page_map tira un panic porque page_lookup devuelve null cuando busca
-	// una pagina en srcva para el envid
 	uintptr_t va = (uintptr_t) pn * PGSIZE;
 
-	// Obtengo la pagina pp dicha
+	// Obtengo el page table entry
 	pte_t actual_pte = uvpt[pn];
+
+	// Me quedo con los bits de permisos
+	int father_perm = actual_pte | PTE_SYSCALL;
 	
 	// Inicialmente los permisos del hijo son heredados del padre
-	int child_perm = actual_pte;
+	int child_perm = father_perm;
 	
 	// Si el padre tiene activado PTE_W, se lo desactivo al hijo
 	// y a su vez le activo el PTE_COW
-	bool is_writeable = (actual_pte & PTE_W);
+	bool is_writeable = (father_perm & PTE_W);
 	if (is_writeable) {
 		child_perm &= ~PTE_W;
 		child_perm |= PTE_COW;
 	}
 	// Mapeo en el hijo la pagina fisica en la misma va
+	// TODO: aca esta mal algun parametro de sys_page_map
 	int r;
 	if ((r = sys_page_map(envid, (void *) va, 0, (void *) va, child_perm)) < 0) {
 		panic("sys_page_map: %e", r);
 	}
 	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
 	if (child_perm & PTE_COW) {
-		actual_pte = child_perm;
+		if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) < 0) {
+			panic("sys_page_map: %e", r);
+		}
 	}
 	return 0;
 }
@@ -206,6 +214,8 @@ fork(void)
 	// Tambien reservo memoria para su UXSTACK
 	set_pgfault_handler(pgfault);
 
+	extern void _pgfault_upcall(void);
+
 	// Creo un nuevo proceso
 	envid_t envid;
 	envid = sys_exofork();
@@ -220,13 +230,14 @@ fork(void)
 
 		return 0;
 	}
+	// TODO: esto esta mal
 	// Instalo en el hijo el handler de excepciones
 	// Tambien reservo memoria para su UXSTACK
 	int r;
 	if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
 		panic("sys_page_alloc: %e", r);
 	}
-	sys_env_set_pgfault_upcall(0, pgfault);
+	sys_env_set_pgfault_upcall(0, _pgfault_upcall);
 
 	// Es el proceso padre
 	bool is_maped;

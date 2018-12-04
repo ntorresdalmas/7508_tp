@@ -230,7 +230,7 @@ fork(void)
 
 		return 0;
 	}
-	// TODO: esto esta mal
+	// TODO: esto esta mal. VER como instalarle el manejador al hijo
 	// Instalo en el hijo el handler de excepciones
 	// Tambien reservo memoria para su UXSTACK
 	int r;

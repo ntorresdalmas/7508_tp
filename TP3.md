@@ -167,8 +167,8 @@ Copia la dirección virtual correspondiente a la dirección física en donde emp
 
 2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?
 
-:construction:
-TODO: leer parte A del lab4 del MIT
+La variable global mpentry_kstack se utiliza mientras boot_aps() está booteando un CPU dado. Se carga con el stack pointer que luego utilizará mpentry.S para el stack dado.
+Si este procedimiento se realizara en mpentry.S, todas las CPUs se cargarían con el mismo stack pointer, lo cual traería serios problemas en caso de una ejecución multi-core.
 
 3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack
 ```

@@ -75,14 +75,14 @@ i386_init(void)
 	ENV_CREATE(user_icode, ENV_TYPE_USER);
 #endif // TEST*
 
-<<<<<<< HEAD
 	// Eliminar esta llamada una vez completada la parte 1
 	// e implementado sched_yield().
 	//env_run(&envs[0]);
-=======
+
+	// TO DO: capaz hay que agregarlo o borrarlo, 
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
->>>>>>> catedra/tp4
+	// TO DO
 
 	// Schedule and run the first user environment!
 	sched_yield();

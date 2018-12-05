@@ -421,7 +421,6 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
-<<<<<<< HEAD
 	struct Env *new_env;
 	envid_t parent_id = 0;
 	
@@ -434,12 +433,11 @@ env_create(uint8_t *binary, enum EnvType type)
 	load_icode(new_env, binary);
 	// Seteo el tipo del proceso
 	new_env->env_type = type;
-=======
 
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O
 	// privileges.
 	// LAB 5: Your code here.
->>>>>>> catedra/tp4
+
 }
 
 //

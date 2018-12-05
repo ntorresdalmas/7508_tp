@@ -109,7 +109,7 @@ duppage(envid_t envid, unsigned pn)
 	}
 	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
 	if (child_perm & PTE_COW) {
-		if ((r = sys_page_map(envid, (void *) va, 0, (void *) va, child_perm)) < 0) {
+		if ((r = sys_page_map(envid, (void *) va, envid, (void *) va, child_perm)) < 0) {
 			panic("sys_page_map: %e", r);
 		}
 	}

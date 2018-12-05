@@ -50,6 +50,19 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
+	/*
+	// Alineo la va a PGSIZE
+	void *addr_aligned = ROUNDDOWN(addr, PGSIZE);
+
+	// Reservo una nueva pagina temporal
+	if ((r = sys_page_alloc(0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
+			panic("sys_page_alloc: %e", r);
+	}
+
+	// Leo el contenido en disco
+	if ((r = ide_read(blockno, );
+	*/
+
 
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk

@@ -48,16 +48,19 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 
+	// Alineo addr a PGSIZE
+	void *addr_aligned = ROUNDDOWN(addr, PGSIZE);
+
 	int r;
 	// Reservo una nueva pagina temporal
 	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
 			panic("sys_page_alloc: %e", r);
 	}
 	// Copio el contenido original a la nueva pagina temporal (addr --> PFTEMP)
-	memmove(PFTEMP, addr, PGSIZE);
+	memmove(PFTEMP, addr_aligned, PGSIZE);
 	
 	// Mapeo la nueva pagina temporal a la original
-	if ((r = sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
+	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
 		panic("sys_page_map: %e", r);
 	}
 	// Elimino la nueva pagina temporal
@@ -90,7 +93,7 @@ duppage(envid_t envid, unsigned pn)
 	pte_t actual_pte = uvpt[pn];
 
 	// Me quedo con los bits de permisos
-	int father_perm = actual_pte | PTE_SYSCALL;
+	int father_perm = actual_pte & PTE_SYSCALL;
 	
 	// Inicialmente los permisos del hijo son heredados del padre
 	int child_perm = father_perm;
@@ -109,7 +112,7 @@ duppage(envid_t envid, unsigned pn)
 	}
 	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
 	if (child_perm & PTE_COW) {
-		if ((r = sys_page_map(envid, (void *) va, envid, (void *) va, child_perm)) < 0) {
+		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) < 0) {
 			panic("sys_page_map: %e", r);
 		}
 	}
@@ -227,24 +230,21 @@ fork(void)
 	if (envid == 0) {
 		// Actualizo la variable thisenv ya que referencia al padre
 		thisenv = &envs[ENVX(sys_getenvid())];
-
-		// TODO: aca esta el error creo
-		// Instalo en el hijo el handler de excepciones
-		// Tambien reservo memoria para su UXSTACK
-		if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_SYSCALL)) < 0) {
-			panic("sys_page_alloc: %e", r);
-		}
-		sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
-		
+	
 		return 0;
 	}
+	// Reservo memoria para el UXSTACK del hijo
+	if ((r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
+		panic("sys_page_alloc: %e", r);
+	}
+	// Instalo el handler de excepciones en el hijo
+	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
 
 	// Es el proceso padre
 	bool is_maped;
 	bool va_in_xstack;
 	int va;
 	
-	// TODO: optimizar este for para no recorrer paginas innecesarias
 	for (va=0; va<UTOP; va+=PGSIZE) {
 		// La region correspondiente a la pila de excepciones (UXSTACK) no se mapea
 		va_in_xstack = (va >= UXSTACKTOP - PGSIZE) && (va < UXSTACKTOP);

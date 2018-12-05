@@ -55,6 +55,9 @@ i386_init(void)
 	// Starting non-boot CPUs
 	boot_aps();
 
+	// Start fs.
+	ENV_CREATE(fs_fs, ENV_TYPE_FS);
+
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
@@ -69,14 +72,17 @@ i386_init(void)
 		ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
+	ENV_CREATE(user_icode, ENV_TYPE_USER);
 #endif // TEST*
 
+<<<<<<< HEAD
 	// Eliminar esta llamada una vez completada la parte 1
 	// e implementado sched_yield().
 	//env_run(&envs[0]);
+=======
+	// Should not be necessary - drains keyboard because interrupt has given up.
+	kbd_intr();
+>>>>>>> catedra/tp4
 
 	// Schedule and run the first user environment!
 	sched_yield();

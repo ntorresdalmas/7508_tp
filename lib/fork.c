@@ -103,14 +103,13 @@ duppage(envid_t envid, unsigned pn)
 		child_perm |= PTE_COW;
 	}
 	// Mapeo en el hijo la pagina fisica en la misma va
-	// TODO: aca esta mal algun parametro de sys_page_map
 	int r;
-	if ((r = sys_page_map(envid, (void *) va, 0, (void *) va, child_perm)) < 0) {
+	if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) < 0) {
 		panic("sys_page_map: %e", r);
 	}
 	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
 	if (child_perm & PTE_COW) {
-		if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) < 0) {
+		if ((r = sys_page_map(envid, (void *) va, 0, (void *) va, child_perm)) < 0) {
 			panic("sys_page_map: %e", r);
 		}
 	}
@@ -210,11 +209,12 @@ fork(void)
 
 	//return fork_v0();
 
+	int r;
+	extern void _pgfault_upcall(void);
+	
 	// Instalo en el padre la funcion 'pgfault' como handler de page faults
 	// Tambien reservo memoria para su UXSTACK
 	set_pgfault_handler(pgfault);
-
-	extern void _pgfault_upcall(void);
 
 	// Creo un nuevo proceso
 	envid_t envid;
@@ -228,16 +228,16 @@ fork(void)
 		// Actualizo la variable thisenv ya que referencia al padre
 		thisenv = &envs[ENVX(sys_getenvid())];
 
+		// TODO: aca esta el error creo
+		// Instalo en el hijo el handler de excepciones
+		// Tambien reservo memoria para su UXSTACK
+		if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_SYSCALL)) < 0) {
+			panic("sys_page_alloc: %e", r);
+		}
+		sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+		
 		return 0;
 	}
-	// TODO: esto esta mal. VER como instalarle el manejador al hijo
-	// Instalo en el hijo el handler de excepciones
-	// Tambien reservo memoria para su UXSTACK
-	int r;
-	if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
-		panic("sys_page_alloc: %e", r);
-	}
-	sys_env_set_pgfault_upcall(0, _pgfault_upcall);
 
 	// Es el proceso padre
 	bool is_maped;

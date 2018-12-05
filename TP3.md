@@ -16,9 +16,12 @@ Si x es 0 (False), siempre cae en case 0 y produce un error en tiempo de compila
  
 1. Al terminar un proceso su función umain() ¿dónde retoma la ejecución el kernel? Describir la secuencia de llamadas desde que termina umain() hasta que el kernel dispone del proceso.
 
-:construction:
+En primer lugar, el kernel cede el control del procesador a un proceso cuando lo pone en ejecución, mediante el scheduler (en JOS se trata de la función sched_yield).
+Una vez finalizada la ejecución del proceso, el kernel retoma el control en la función mencionada y decide nuevamente qué proceso poner en ejecución.
+Si no quedan procesos por correr, el kernel llama a la función sched_halt(), la cual se encarga de "hacer nada" hasta que ocurra algún evento nuevo (proceso por correr o interrupción). Cabe destacar que dicha función se encarga de resetear el stack pointer y habilitar interrupciones.
  
 2. ¿En qué cambia la función env_destroy() en este TP, respecto al TP anterior?
+
 La nueva versión de env_destroy(e) primero detecta si el env a eliminar está corriendo en otro CPU, en cuyo caso le cambia el estado para que la próxima vez el Kernel lo detecte y lo libere.
 Caso contrario lo destruye, se fija si está el env actual corriendo y llama a sched_yield() para detectar el próximo env a ejecutar (mediante Round Robin).
 
@@ -126,7 +129,6 @@ Primero, aloca una página en la dirección recibida con los permisos PTE_U | PT
 Segundo, comparte la página alocada con una dirección temporal (UTEMP)
 Tercero, mueve el contenido de la dirección temporal a la dirección recibida
 Cuarto, libera la dirección temporal alocada.
-
 
 4. Supongamos que se añade a duppage() un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo. Indicar qué llamada adicional se debería hacer si el booleano es true.
 
@@ -263,6 +265,7 @@ Responder con redondeo a 12 bits, justificando desde qué región de memoria se 
 
 :construction:
 
+
 -------
 :clubs: ipc_rev
 
@@ -309,7 +312,6 @@ if (!e->env_ipc_recving) {
 }
 ```
 
-
 ----------------
 :clubs: fork
 
@@ -318,4 +320,5 @@ if (!e->env_ipc_recving) {
 
 No, no puede utilizarse la función set_pgfault_handler(). Considerar que para este punto de la ejecución el padre ya va a haber configurado toda la memoria y, por lo tanto, la mencionada variable global _pgfault_handler_ no sería NULL. Ergo, nunca se reservaría la memoria para el UXSTACK del hijo ni se instalaría su manejador de excepciones. Y, como si fuera poco, la última línea que asigna el handler a _pgfault_handler_ generaría un page fault, porque la página que aloja dicha variable estaría marcada como copy-on-write.
 
-Para solucionar esto, se reserva una página para el UXSTACK del hijo con sys_page_alloc() y luego se le instala su manejador de excepciones, directamente con la syscall sys_env_set_pgfault_upcall(), cuyo manejador será pgfault. Estas dos operaciones deben realizarse luego de manejar el caso del hijo (envid==0) pero antes de copiar el address space del padre al hijo.
+:construction:
+Para solucionar esto, TODO

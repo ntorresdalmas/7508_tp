@@ -257,14 +257,100 @@ movl $(RELOC(entry_pgdir)), %eax"
 ¿Qué valor tiene el registro %eip cuando se ejecuta esa línea?
 Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.
 
+Desde KSTACKTOP (0xf0000000) para abajo, hasta MMIOLIM (0xefc00000), estan mapeados los stacks de las CPUs.
+Entonces deducimos que el $eip va a empezar con 0xef...
+
 ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?	
 
-:construction:
+No se detiene.
 
 5. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP.
 
-:construction:
+```
+$ make gdb
+gdb -q -s obj/kern/kernel -ex 'target remote 127.0.0.1:26000' -n -x .gdbinit
+Reading symbols from obj/kern/kernel...done.
+Remote debugging using 127.0.0.1:26000
+warning: No executable has been specified and target does not support
+determining executable automatically.  Try using the "file" command.
+0x0000fff0 in ?? ()
+(gdb) b *0x7000 thread 4
+Breakpoint 1 at 0x7000
+(gdb) c
+Continuing.
 
+Thread 2 received signal SIGTRAP, Trace/breakpoint trap.
+[Switching to Thread 2]
+warning: A handler for the OS ABI "GNU/Linux" is not built into this configuration
+of GDB.  Attempting to continue with the default i8086 settings.
+
+The target architecture is assumed to be i8086
+[ 700:   0]    0x7000:  cli    
+0x00000000 in ?? ()
+(gdb) disable 1
+(gdb) si 10
+The target architecture is assumed to be i386
+=> 0x7020:  mov    $0x10,%ax
+0x00007020 in ?? ()
+(gdb) x/10i $eip
+=> 0x7020:  mov    $0x10,%ax
+   0x7024:  mov    %eax,%ds
+   0x7026:  mov    %eax,%es
+   0x7028:  mov    %eax,%ss
+   0x702a:  mov    $0x0,%ax
+   0x702e:  mov    %eax,%fs
+   0x7030:  mov    %eax,%gs
+   0x7032:  mov    $0x120000,%eax
+   0x7037:  mov    %eax,%cr3
+   0x703a:  mov    %cr4,%eax
+(gdb) watch $eax == 0x120000
+Watchpoint 2: $eax == 0x120000
+(gdb) c
+Continuing.
+=> 0x7037:  mov    %eax,%cr3
+
+Thread 2 hit Watchpoint 2: $eax == 0x120000
+
+Old value = 0
+New value = 1
+0x00007037 in ?? ()
+(gdb) p $eip
+$1 = (void (*)()) 0x7037
+
+
+(gdb) si
+=> 0x703a:  mov    %cr4,%eax
+0x0000703a in ?? ()
+
+(gdb) si
+=> 0x703d:  or     $0x10,%eax
+Thread 2 hit Watchpoint 2: $eax == 0x120000
+Old value = 1
+New value = 0
+0x0000703d in ?? ()
+(gdb) si
+=> 0x7040:  mov    %eax,%cr4
+0x00007040 in ?? ()
+
+(gdb) si
+=> 0x7043:  mov    %cr0,%eax
+0x00007043 in ?? ()
+
+(gdb) si
+=> 0x7046:  or     $0x80010001,%eax
+0x00007046 in ?? ()
+
+(gdb) si
+=> 0x704b:  mov    %eax,%cr0
+0x0000704b in ?? ()
+
+(gdb) si
+=> 0x704e:  mov    0xf01ede84,%esp
+0x0000704e in ?? ()
+
+(gdb) p mpentry_kstack
+$9 = (void *) 0xf01ff000 <percpu_kstacks+65536>
+```
 
 -------
 :clubs: ipc_rev
@@ -320,5 +406,4 @@ if (!e->env_ipc_recving) {
 
 No, no puede utilizarse la función set_pgfault_handler(). Considerar que para este punto de la ejecución el padre ya va a haber configurado toda la memoria y, por lo tanto, la mencionada variable global _pgfault_handler_ no sería NULL. Ergo, nunca se reservaría la memoria para el UXSTACK del hijo ni se instalaría su manejador de excepciones. Y, como si fuera poco, la última línea que asigna el handler a _pgfault_handler_ generaría un page fault, porque la página que aloja dicha variable estaría marcada como copy-on-write.
 
-:construction:
-Para solucionar esto, TODO
+Para solucionar esto, se le reserva memoria para el UXSTACK del hijo con sys_page_alloc() y luego se le instala el handler de las excepciones en el hijo llamando a sys_env_set_pgfault_upcall().

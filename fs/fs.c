@@ -62,7 +62,30 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+	//panic("alloc_block not implemented");
+	
+	int r;
+
+	// Recorro todos los bloques del disco y chequedo c/u en el bitmap
+	// en busca del primero libre. Tener en cuenta:
+	// blockno = 0 --> boot block
+	// blockno = 1 --> super block
+	// blockno = 2 --> bitmap
+	int i;
+	for (i = 3; i < super->s_nblocks; i++) {
+		if (block_is_free(i)) {
+			// Reservo una nueva pagina para el bloque
+			if ((r = sys_page_alloc(0, diskaddr(i), PTE_P|PTE_U|PTE_W)) < 0) {
+				panic("sys_page_alloc: %e", r);
+			}
+			// Actualizo el bitmap (1: libre --> 0: ocupado)
+			bitmap[i / 32] |= 0 << (i % 32);
+			// Cargo el bitmap actualizado al disco
+			flush_block(bitmap);
+			// Devuelvo el numero de bloque
+			return i;
+		}
+	}
 	return -E_NO_DISK;
 }
 

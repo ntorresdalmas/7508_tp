@@ -50,19 +50,22 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
-	/*
-	// Alineo la va a PGSIZE
-	void *addr_aligned = ROUNDDOWN(addr, PGSIZE);
+	
+	// Alineo addr a BLKSIZE
+	addr = ROUNDDOWN(addr, BLKSIZE);
+	// Numero de sector
+	uint32_t secno = blockno * BLKSECTS;
+	// Sectores a leer
+	size_t nsecs = BLKSECTS;
 
-	// Reservo una nueva pagina temporal
-	if ((r = sys_page_alloc(0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
-			panic("sys_page_alloc: %e", r);
+	// Reservo una nueva pagina
+	if ((r = sys_page_alloc(0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
+		panic("sys_page_alloc: %e", r);
 	}
-
-	// Leo el contenido en disco
-	if ((r = ide_read(blockno, );
-	*/
-
+	// Leo el contenido de disco y lo cargo en la nueva pagina (disco --> addr)
+	if ((r = ide_read(secno, addr, nsecs)) < 0) {
+		panic("ide_read: %e", r);
+	}
 
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
@@ -93,7 +96,33 @@ flush_block(void *addr)
 		panic("flush_block of bad va %08x", addr);
 
 	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+	//panic("flush_block not implemented");
+	
+	int r;
+
+	// Alineo addr a BLKSIZE
+	addr = ROUNDDOWN(addr, BLKSIZE);
+
+	// La va esta mapeada (es decir, esta en el block cache)
+	bool va_mapped = va_is_mapped(addr);
+	// La va esta dirty
+	bool va_dirty = va_is_dirty(addr);
+	
+	if (va_mapped && va_dirty) {
+		// Numero de sector
+		uint32_t secno = blockno * BLKSECTS;
+		// Sectores a leer
+		size_t nsecs = BLKSECTS;
+
+		// Escribo el contenido en el disco (addr --> disco)
+		if ((r = ide_write(secno, addr, nsecs)) < 0) {
+			panic("ide_write: %e", r);
+		}
+		// Limpio el bit dirty (lo pongo en 0)
+		if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) {
+			panic("in flush_block, sys_page_map: %e", r);
+		}
+	}
 }
 
 // Test that the block cache works, by smashing the superblock and

@@ -175,7 +175,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 			// Reservo un bloque nuevo
 			int blockno;
 			if ((blockno = alloc_block()) < 0) {
-				return -E_NO_DISK;
+				return blockno;
 			}
 			// Lo guardo en el bloque indirecto
 			f->f_indirect = blockno;

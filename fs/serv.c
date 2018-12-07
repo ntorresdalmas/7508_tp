@@ -222,7 +222,39 @@ serve_read(envid_t envid, union Fsipc *ipc)
 		        req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+
+	struct OpenFile *o;
+	int r;
+	// Me guardo el openfile en o.
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
+		return r;
+	}
+	struct Fd* fd = o->o_fd;
+	// Offset (seek) en el archivo
+	off_t offset = fd->fd_offset;
+	// Archivo actual
+	struct File* f = o->o_file;
+	// Tamanio del archivo en bytes
+	off_t file_size = f->f_size;
+	// Bytes a leer
+	size_t bytes_req = req->req_n;
+	// Calculo la cantidad de bytes reales que va a leer file_read()
+	size_t bytes_to_read = MIN(bytes_req, file_size - offset);
+
+	// Si los bytes a leer superan el tamanio del buffer, los limito
+	if (bytes_to_read > PGSIZE) {
+		bytes_to_read = PGSIZE;
+	}
+
+	// Me devuelve la # de bytes leidos a partir del offset
+	int bytes_read;
+	if ((bytes_read = file_read(f, ret->ret_buf, bytes_to_read, offset)) < 0){
+		return bytes_read;
+	}
+	// Actualizo el offset (seek) segun los bytes leidos
+	fd->fd_offset += bytes_read;
+
+	return bytes_read;
 }
 
 
@@ -240,7 +272,33 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		        req->req_n);
 
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	//panic("serve_write not implemented");
+
+	struct OpenFile *o;
+	int r;
+	// Me guardo el openfile en o.
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
+		return r;
+	}
+	struct Fd* fd = o->o_fd;
+	// Offset (seek) en el archivo
+	off_t offset = fd->fd_offset;
+	// Archivo actual
+	struct File* f = o->o_file;
+	// Tamanio del archivo en bytes
+	off_t file_size = f->f_size;
+
+	size_t bytes_to_write = req->req_n;
+
+	// 
+	int bytes_written;
+	if ((bytes_written = file_write(f, req->req_buf, bytes_to_write, offset)) < 0){
+		return bytes_written;
+	}
+
+	fd->fd_offset += bytes_written;
+
+	return bytes_written;
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the

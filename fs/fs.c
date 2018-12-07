@@ -163,12 +163,10 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 	}
 	// Bloques directos
 	if (filebno < NDIRECT) {
-		// TODO: ojo! ver que pasa si f->f_direct = 0
-		*ppdiskbno = &f->f_direct[filebno];
+		// Me guardo la direccion si esta alocado el bloque, 0 en caso contrario
+		*ppdiskbno = f->f_direct[filebno] ? &f->f_direct[filebno] : 0;
 	} else {
 	// Bloques indirectos
-		int indirect_blockno = f->f_indirect;
-
 		// No hay bloque indirecto alocado
 		if (f->f_indirect == 0) {
 			if (!alloc) {
@@ -179,13 +177,18 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 			if ((blockno = alloc_block()) < 0) {
 				return -E_NO_DISK;
 			}
-			// Me guardo el nuevo numero de bloque
-			indirect_blockno = blockno;
-			// TODO: segun el comentario, tendriamos que hacer un free_block(blockno)
-			// ...
+			// Lo guardo en el bloque indirecto
+			f->f_indirect = blockno;
+			// Limpio el bloque (lo lleno de 0s)
+			memset(diskaddr(f->f_indirect), 0, BLKSIZE);
 		}
-		void *block_addr = diskaddr(indirect_blockno);
-		*ppdiskbno = block_addr + BLKSIZE * (filebno - NDIRECT);
+		uint32_t *indirect;
+		// Apunto indirect al principio del bloque de indirectos
+		indirect = &f->f_indirect;
+		// Muevo indirect al bloque correspondiente dentro del indirecto
+		indirect += (filebno - NDIRECT);
+		// Me guardo la direccion
+		*ppdiskbno = indirect;
 	}
 
 	return 0;
@@ -208,17 +211,24 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 	if (filebno >= NDIRECT + NINDIRECT) {
 		return -E_INVAL;
 	}
-
+	// Obtengo el numero de bloque en disco para 'filebno' y lo guardo en 'pdiskbno'
+	uint32_t *pdiskbno;
 	int r;
-	if ((r = file_block_walk(f, filebno, (uint32_t **) blk, 0)) < 0) {
+	if ((r = file_block_walk(f, filebno, &pdiskbno, 1)) < 0) {
 		return r;
 	}
-
-	// Reservo un bloque nuevo
-	// TODO: ver adentro de que if va esto
-	int blockno;
-	if ((blockno = alloc_block()) < 0) {
-		return -E_NO_DISK;
+	// No hay bloque en el file
+	if (*pdiskbno == 0) {
+		// Reservo un bloque nuevo
+		int blockno;
+		if ((blockno = alloc_block()) < 0) {
+			return -E_NO_DISK;
+		}
+		// Me guardo la direccion del nuevo bloque en disco
+		*blk = diskaddr(blockno);
+	} else {
+		// Me guardo la direccion del bloque obtenido por file_block_walk
+		*blk = (char *) pdiskbno;
 	}
 
 	return 0;

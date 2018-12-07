@@ -72,14 +72,14 @@ alloc_block(void)
 	// blockno = 1 --> super block
 	// blockno = 2 --> bitmap
 	int i;
-	for (i = 3; i < super->s_nblocks; i++) {
+	for (i = 0; i < super->s_nblocks; i++) {
 		if (block_is_free(i)) {
 			// Reservo una nueva pagina para el bloque
 			if ((r = sys_page_alloc(0, diskaddr(i), PTE_P|PTE_U|PTE_W)) < 0) {
 				panic("sys_page_alloc: %e", r);
 			}
 			// Actualizo el bitmap (1: libre --> 0: ocupado)
-			bitmap[i / 32] |= 0 << (i % 32);
+			bitmap[i / 32] &= 0 << (i % 32);
 			// Cargo el bitmap actualizado al disco
 			flush_block(bitmap);
 			// Devuelvo el numero de bloque
@@ -156,7 +156,39 @@ static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
 	// LAB 5: Your code here.
-	panic("file_block_walk not implemented");
+	//panic("file_block_walk not implemented");
+
+	if (filebno >= NDIRECT + NINDIRECT) {
+		return -E_INVAL;
+	}
+	// Bloques directos
+	if (filebno < NDIRECT) {
+		// TODO: ojo! ver que pasa si f->f_direct = 0
+		*ppdiskbno = &f->f_direct[filebno];
+	} else {
+	// Bloques indirectos
+		int indirect_blockno = f->f_indirect;
+
+		// No hay bloque indirecto alocado
+		if (f->f_indirect == 0) {
+			if (!alloc) {
+				return -E_NOT_FOUND;
+			}
+			// Reservo un bloque nuevo
+			int blockno;
+			if ((blockno = alloc_block()) < 0) {
+				return -E_NO_DISK;
+			}
+			// Me guardo el nuevo numero de bloque
+			indirect_blockno = blockno;
+			// TODO: segun el comentario, tendriamos que hacer un free_block(blockno)
+			// ...
+		}
+		void *block_addr = diskaddr(indirect_blockno);
+		*ppdiskbno = block_addr + BLKSIZE * (filebno - NDIRECT);
+	}
+
+	return 0;
 }
 
 // Set *blk to the address in memory where the filebno'th
@@ -171,7 +203,25 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
-	panic("file_get_block not implemented");
+	//panic("file_get_block not implemented");
+
+	if (filebno >= NDIRECT + NINDIRECT) {
+		return -E_INVAL;
+	}
+
+	int r;
+	if ((r = file_block_walk(f, filebno, (uint32_t **) blk, 0)) < 0) {
+		return r;
+	}
+
+	// Reservo un bloque nuevo
+	// TODO: ver adentro de que if va esto
+	int blockno;
+	if ((blockno = alloc_block()) < 0) {
+		return -E_NO_DISK;
+	}
+
+	return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.

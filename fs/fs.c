@@ -184,7 +184,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 		}
 		uint32_t *indirect;
 		// Apunto indirect al principio del bloque de indirectos
-		indirect = &f->f_indirect;
+		indirect = diskaddr(f->f_indirect);
 		// Muevo indirect al bloque correspondiente dentro del indirecto
 		indirect += (filebno - NDIRECT);
 		// Me guardo la direccion
@@ -228,7 +228,7 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 		*blk = diskaddr(blockno);
 	} else {
 		// Me guardo la direccion del bloque obtenido por file_block_walk
-		*blk = (char *) pdiskbno;
+		*blk = diskaddr(*pdiskbno);
 	}
 
 	return 0;

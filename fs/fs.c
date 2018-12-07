@@ -164,7 +164,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 	// Bloques directos
 	if (filebno < NDIRECT) {
 		// Me guardo la direccion si esta alocado el bloque, 0 en caso contrario
-		*ppdiskbno = f->f_direct[filebno] ? &f->f_direct[filebno] : 0;
+		*ppdiskbno = &f->f_direct[filebno];
 	} else {
 	// Bloques indirectos
 		// No hay bloque indirecto alocado

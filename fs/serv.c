@@ -225,30 +225,32 @@ serve_read(envid_t envid, union Fsipc *ipc)
 
 	struct OpenFile *o;
 	int r;
-	// Me guardo el openfile en o.
+	// Me guardo el openfile en o
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
 		return r;
 	}
+	// File Descriptor
 	struct Fd* fd = o->o_fd;
 	// Offset (seek) en el archivo
 	off_t offset = fd->fd_offset;
 	// Archivo actual
-	struct File* f = o->o_file;
-	// Tamanio del archivo en bytes
-	off_t file_size = f->f_size;
+	struct File* file = o->o_file;
+	// Tamaño del archivo en bytes
+	off_t file_size = file->f_size;
 	// Bytes a leer
 	size_t bytes_req = req->req_n;
 	// Calculo la cantidad de bytes reales que va a leer file_read()
 	size_t bytes_to_read = MIN(bytes_req, file_size - offset);
 
-	// Si los bytes a leer superan el tamanio del buffer, los limito
+	// Si los bytes a leer superan el tamaño del buffer, los limito al max (PGSIZE)
 	if (bytes_to_read > PGSIZE) {
 		bytes_to_read = PGSIZE;
 	}
 
-	// Me devuelve la # de bytes leidos a partir del offset
+	// Leo 'bytes to read' bytes a partir del offset (file --> ret_buf)
+	// La cantidad leida me queda en 'bytes_read'
 	int bytes_read;
-	if ((bytes_read = file_read(f, ret->ret_buf, bytes_to_read, offset)) < 0){
+	if ((bytes_read = file_read(file, ret->ret_buf, bytes_to_read, offset)) < 0){
 		return bytes_read;
 	}
 	// Actualizo el offset (seek) segun los bytes leidos
@@ -280,19 +282,21 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
 		return r;
 	}
+	// File Descriptor
 	struct Fd* fd = o->o_fd;
 	// Offset (seek) en el archivo
 	off_t offset = fd->fd_offset;
 	// Archivo actual
-	struct File* f = o->o_file;
-	// Tamanio del archivo en bytes
-	off_t file_size = f->f_size;
-
+	struct File* file = o->o_file;
+	// Tamaño del archivo en bytes
+	off_t file_size = file->f_size;
+	// Cantidad de bytes a escribir
 	size_t bytes_to_write = req->req_n;
 
-	// 
+	// Escribo 'bytes to write' bytes a partir del offset (ret_buf --> file)
+	// La cantidad escrita me queda en 'bytes_written'
 	int bytes_written;
-	if ((bytes_written = file_write(f, req->req_buf, bytes_to_write, offset)) < 0){
+	if ((bytes_written = file_write(file, req->req_buf, bytes_to_write, offset)) < 0){
 		return bytes_written;
 	}
 

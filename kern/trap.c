@@ -87,7 +87,7 @@ void trap_18(void);
 void trap_19(void);
 void trap_20(void);
 // Excepciones 21 a 31 estan reservadas por Intel
-// Excepciones IRQ_OFFSET = 32 a IRQ_OFFSET + 15 = 47 son para IRQs
+// Excepciones 32 a 47 (IRQ_OFFSET a IRQ_OFFSET + 15) son para IRQs
 void trap_32(void);
 void trap_33(void);
 void trap_34(void);
@@ -129,7 +129,7 @@ trap_init(void)
 	SETGATE(idt[19], 0, GD_KT, trap_19, 0);
 	SETGATE(idt[20], 0, GD_KT, trap_20, 0);
 	// Excepciones 21 a 31 estan reservadas por Intel
-	// Excepciones 32 a 27 (IRQ_OFFSET a IRQ_OFFSET + 15) son para IRQs
+	// Excepciones 32 a 47 (IRQ_OFFSET a IRQ_OFFSET + 15) son para IRQs
 	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_32, 0);
 	SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, trap_33, 0);
 	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, trap_34, 0);

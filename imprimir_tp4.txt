@@ -1,0 +1,866 @@
+diff --git a/fs/bc.c b/fs/bc.c
+index ec59cfb..747ea80 100644
+--- a/fs/bc.c
++++ b/fs/bc.c
+@@ -50,6 +50,22 @@ bc_pgfault(struct UTrapframe *utf)
+ 	// the disk.
+ 	//
+ 	// LAB 5: you code here:
++	
++	// Alineo addr a BLKSIZE
++	addr = ROUNDDOWN(addr, BLKSIZE);
++	// Numero de sector
++	uint32_t secno = blockno * BLKSECTS;
++	// Sectores a leer
++	size_t nsecs = BLKSECTS;
++
++	// Reservo una nueva pagina
++	if ((r = sys_page_alloc(0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
++		panic("sys_page_alloc: %e", r);
++	}
++	// Leo el contenido de disco y lo cargo en la nueva pagina (disco --> addr)
++	if ((r = ide_read(secno, addr, nsecs)) < 0) {
++		panic("ide_read: %e", r);
++	}
+ 
+ 	// Clear the dirty bit for the disk block page since we just read the
+ 	// block from disk
+@@ -80,7 +96,33 @@ flush_block(void *addr)
+ 		panic("flush_block of bad va %08x", addr);
+ 
+ 	// LAB 5: Your code here.
+-	panic("flush_block not implemented");
++	//panic("flush_block not implemented");
++	
++	int r;
++
++	// Alineo addr a BLKSIZE
++	addr = ROUNDDOWN(addr, BLKSIZE);
++
++	// La va esta mapeada (es decir, esta en el block cache)
++	bool va_mapped = va_is_mapped(addr);
++	// La va esta dirty
++	bool va_dirty = va_is_dirty(addr);
++	
++	if (va_mapped && va_dirty) {
++		// Numero de sector
++		uint32_t secno = blockno * BLKSECTS;
++		// Sectores a leer
++		size_t nsecs = BLKSECTS;
++
++		// Escribo el contenido en el disco (addr --> disco)
++		if ((r = ide_write(secno, addr, nsecs)) < 0) {
++			panic("ide_write: %e", r);
++		}
++		// Limpio el bit dirty (lo pongo en 0)
++		if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) {
++			panic("in flush_block, sys_page_map: %e", r);
++		}
++	}
+ }
+ 
+ // Test that the block cache works, by smashing the superblock and
+diff --git a/fs/fs.c b/fs/fs.c
+index 875f451..7bb3113 100644
+--- a/fs/fs.c
++++ b/fs/fs.c
+@@ -62,7 +62,30 @@ alloc_block(void)
+ 	// super->s_nblocks blocks in the disk altogether.
+ 
+ 	// LAB 5: Your code here.
+-	panic("alloc_block not implemented");
++	//panic("alloc_block not implemented");
++	
++	int r;
++
++	// Recorro todos los bloques del disco y chequedo c/u en el bitmap
++	// en busca del primero libre. Tener en cuenta:
++	// blockno = 0 --> boot block
++	// blockno = 1 --> super block
++	// blockno = 2 --> bitmap
++	int i;
++	for (i = 0; i < super->s_nblocks; i++) {
++		if (block_is_free(i)) {
++			// Reservo una nueva pagina para el bloque
++			if ((r = sys_page_alloc(0, diskaddr(i), PTE_P|PTE_U|PTE_W)) < 0) {
++				panic("sys_page_alloc: %e", r);
++			}
++			// Actualizo el bitmap (1: libre --> 0: ocupado)
++			bitmap[i / 32] &= 0 << (i % 32);
++			// Cargo el bitmap actualizado al disco
++			flush_block(bitmap);
++			// Devuelvo el numero de bloque
++			return i;
++		}
++	}
+ 	return -E_NO_DISK;
+ }
+ 
+@@ -133,7 +156,42 @@ static int
+ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
+ {
+ 	// LAB 5: Your code here.
+-	panic("file_block_walk not implemented");
++	//panic("file_block_walk not implemented");
++
++	if (filebno >= NDIRECT + NINDIRECT) {
++		return -E_INVAL;
++	}
++	// Bloques directos
++	if (filebno < NDIRECT) {
++		// Me guardo la direccion si esta alocado el bloque, 0 en caso contrario
++		*ppdiskbno = &f->f_direct[filebno];
++	} else {
++	// Bloques indirectos
++		// No hay bloque indirecto alocado
++		if (f->f_indirect == 0) {
++			if (!alloc) {
++				return -E_NOT_FOUND;
++			}
++			// Reservo un bloque nuevo
++			int blockno;
++			if ((blockno = alloc_block()) < 0) {
++				return blockno;
++			}
++			// Lo guardo en el bloque indirecto
++			f->f_indirect = blockno;
++			// Limpio el bloque (lo lleno de 0s)
++			memset(diskaddr(f->f_indirect), 0, BLKSIZE);
++		}
++		uint32_t *indirect;
++		// Apunto indirect al principio del bloque de indirectos
++		indirect = diskaddr(f->f_indirect);
++		// Muevo indirect al bloque correspondiente dentro del indirecto
++		indirect += (filebno - NDIRECT);
++		// Me guardo la direccion
++		*ppdiskbno = indirect;
++	}
++
++	return 0;
+ }
+ 
+ // Set *blk to the address in memory where the filebno'th
+@@ -148,7 +206,32 @@ int
+ file_get_block(struct File *f, uint32_t filebno, char **blk)
+ {
+ 	// LAB 5: Your code here.
+-	panic("file_get_block not implemented");
++	//panic("file_get_block not implemented");
++
++	if (filebno >= NDIRECT + NINDIRECT) {
++		return -E_INVAL;
++	}
++	// Obtengo el numero de bloque en disco para 'filebno' y lo guardo en 'pdiskbno'
++	uint32_t *pdiskbno;
++	int r;
++	if ((r = file_block_walk(f, filebno, &pdiskbno, 1)) < 0) {
++		return r;
++	}
++	// No hay bloque en el file
++	if (*pdiskbno == 0) {
++		// Reservo un bloque nuevo
++		int blockno;
++		if ((blockno = alloc_block()) < 0) {
++			return -E_NO_DISK;
++		}
++		// Me guardo la direccion del nuevo bloque en disco
++		*blk = diskaddr(blockno);
++	} else {
++		// Me guardo la direccion del bloque obtenido por file_block_walk
++		*blk = diskaddr(*pdiskbno);
++	}
++
++	return 0;
+ }
+ 
+ // Try to find a file named "name" in dir.  If so, set *file to it.
+diff --git a/fs/serv.c b/fs/serv.c
+index f38153b..0564fc4 100644
+--- a/fs/serv.c
++++ b/fs/serv.c
+@@ -222,7 +222,39 @@ serve_read(envid_t envid, union Fsipc *ipc)
+ 		        req->req_n);
+ 
+ 	// Lab 5: Your code here:
+-	return 0;
++
++	struct OpenFile *o;
++	int r;
++	// Me guardo el openfile en o.
++	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
++		return r;
++	}
++	struct Fd* fd = o->o_fd;
++	// Offset (seek) en el archivo
++	off_t offset = fd->fd_offset;
++	// Archivo actual
++	struct File* f = o->o_file;
++	// Tamanio del archivo en bytes
++	off_t file_size = f->f_size;
++	// Bytes a leer
++	size_t bytes_req = req->req_n;
++	// Calculo la cantidad de bytes reales que va a leer file_read()
++	size_t bytes_to_read = MIN(bytes_req, file_size - offset);
++
++	// Si los bytes a leer superan el tamanio del buffer, los limito
++	if (bytes_to_read > PGSIZE) {
++		bytes_to_read = PGSIZE;
++	}
++
++	// Me devuelve la # de bytes leidos a partir del offset
++	int bytes_read;
++	if ((bytes_read = file_read(f, ret->ret_buf, bytes_to_read, offset)) < 0){
++		return bytes_read;
++	}
++	// Actualizo el offset (seek) segun los bytes leidos
++	fd->fd_offset += bytes_read;
++
++	return bytes_read;
+ }
+ 
+ 
+@@ -240,7 +272,33 @@ serve_write(envid_t envid, struct Fsreq_write *req)
+ 		        req->req_n);
+ 
+ 	// LAB 5: Your code here.
+-	panic("serve_write not implemented");
++	//panic("serve_write not implemented");
++
++	struct OpenFile *o;
++	int r;
++	// Me guardo el openfile en o.
++	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
++		return r;
++	}
++	struct Fd* fd = o->o_fd;
++	// Offset (seek) en el archivo
++	off_t offset = fd->fd_offset;
++	// Archivo actual
++	struct File* f = o->o_file;
++	// Tamanio del archivo en bytes
++	off_t file_size = f->f_size;
++
++	size_t bytes_to_write = req->req_n;
++
++	// 
++	int bytes_written;
++	if ((bytes_written = file_write(f, req->req_buf, bytes_to_write, offset)) < 0){
++		return bytes_written;
++	}
++
++	fd->fd_offset += bytes_written;
++
++	return bytes_written;
+ }
+ 
+ // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
+diff --git a/kern/env.c b/kern/env.c
+index 6853bc8..98ad172 100644
+--- a/kern/env.c
++++ b/kern/env.c
+@@ -437,7 +437,9 @@ env_create(uint8_t *binary, enum EnvType type)
+ 	// If this is the file server (type == ENV_TYPE_FS) give it I/O
+ 	// privileges.
+ 	// LAB 5: Your code here.
+-
++	if (type == ENV_TYPE_FS) {
++		new_env->env_tf.tf_eflags = FL_IOPL_MASK;
++	}
+ }
+ 
+ //
+diff --git a/lib/file.c b/lib/file.c
+index f2e0b45..745fe99 100644
+--- a/lib/file.c
++++ b/lib/file.c
+@@ -141,7 +141,17 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
+ 	// remember that write is always allowed to write *fewer*
+ 	// bytes than requested.
+ 	// LAB 5: Your code here
+-	panic("devfile_write not implemented");
++	//panic("devfile_write not implemented");
++
++	int r;
++	fsipcbuf.write.req_fileid = fd->fd_file.id;
++	fsipcbuf.write.req_n = n;
++	if ((r = fsipc(FSREQ_WRITE, NULL)) < 0)
++		return r;
++	assert(r <= PGSIZE);
++	memmove(fsipcbuf.write.req_buf, buf, r);
++
++	return r;
+ }
+ 
+ static int
+diff --git a/lib/fork.c b/lib/fork.c
+index 28250fb..31d3909 100644
+--- a/lib/fork.c
++++ b/lib/fork.c
+@@ -48,16 +48,19 @@ pgfault(struct UTrapframe *utf)
+ 
+ 	// LAB 4: Your code here.
+ 
++	// Alineo addr a PGSIZE
++	void *addr_aligned = ROUNDDOWN(addr, PGSIZE);
++
+ 	int r;
+ 	// Reservo una nueva pagina temporal
+ 	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
+ 			panic("sys_page_alloc: %e", r);
+ 	}
+ 	// Copio el contenido original a la nueva pagina temporal (addr --> PFTEMP)
+-	memmove(PFTEMP, addr, PGSIZE);
++	memmove(PFTEMP, addr_aligned, PGSIZE);
+ 	
+ 	// Mapeo la nueva pagina temporal a la original
+-	if ((r = sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
++	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
+ 		panic("sys_page_map: %e", r);
+ 	}
+ 	// Elimino la nueva pagina temporal
+@@ -90,7 +93,7 @@ duppage(envid_t envid, unsigned pn)
+ 	pte_t actual_pte = uvpt[pn];
+ 
+ 	// Me quedo con los bits de permisos
+-	int father_perm = actual_pte | PTE_SYSCALL;
++	int father_perm = actual_pte & PTE_SYSCALL;
+ 	
+ 	// Inicialmente los permisos del hijo son heredados del padre
+ 	int child_perm = father_perm;
+@@ -109,7 +112,7 @@ duppage(envid_t envid, unsigned pn)
+ 	}
+ 	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
+ 	if (child_perm & PTE_COW) {
+-		if ((r = sys_page_map(envid, (void *) va, envid, (void *) va, child_perm)) < 0) {
++		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) < 0) {
+ 			panic("sys_page_map: %e", r);
+ 		}
+ 	}
+@@ -227,24 +230,21 @@ fork(void)
+ 	if (envid == 0) {
+ 		// Actualizo la variable thisenv ya que referencia al padre
+ 		thisenv = &envs[ENVX(sys_getenvid())];
+-
+-		// TODO: aca esta el error creo
+-		// Instalo en el hijo el handler de excepciones
+-		// Tambien reservo memoria para su UXSTACK
+-		if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_SYSCALL)) < 0) {
+-			panic("sys_page_alloc: %e", r);
+-		}
+-		sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+-		
++	
+ 		return 0;
+ 	}
++	// Reservo memoria para el UXSTACK del hijo
++	if ((r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
++		panic("sys_page_alloc: %e", r);
++	}
++	// Instalo el handler de excepciones en el hijo
++	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+ 
+ 	// Es el proceso padre
+ 	bool is_maped;
+ 	bool va_in_xstack;
+ 	int va;
+ 	
+-	// TODO: optimizar este for para no recorrer paginas innecesarias
+ 	for (va=0; va<UTOP; va+=PGSIZE) {
+ 		// La region correspondiente a la pila de excepciones (UXSTACK) no se mapea
+ 		va_in_xstack = (va >= UXSTACKTOP - PGSIZE) && (va < UXSTACKTOP);
+make clean
+make[1]: Entering directory '/home/ntorresdalmas/Desktop/sisop/tp/7508_tp'
+rm -rf obj jos.in qemu.log
+make[1]: Leaving directory '/home/ntorresdalmas/Desktop/sisop/tp/7508_tp'
+./grade-lab5 
+make[1]: Entering directory '/home/ntorresdalmas/Desktop/sisop/tp/7508_tp'
++ as kern/entry.S
++ cc kern/entrypgdir.c
++ cc kern/init.c
++ cc kern/console.c
++ cc kern/monitor.c
++ cc kern/pmap.c
++ cc kern/env.c
++ cc kern/kclock.c
++ cc kern/picirq.c
++ cc kern/printf.c
++ cc kern/trap.c
++ as kern/trapentry.S
++ cc kern/sched.c
++ cc kern/syscall.c
++ cc kern/kdebug.c
++ cc lib/printfmt.c
++ cc lib/readline.c
++ cc lib/string.c
++ as kern/mpentry.S
++ cc kern/mpconfig.c
++ cc kern/lapic.c
++ cc kern/spinlock.c
++ as[USER] lib/entry.S
++ cc[USER] lib/console.c
++ cc[USER] lib/libmain.c
++ cc[USER] lib/exit.c
++ cc[USER] lib/panic.c
++ cc[USER] lib/printf.c
++ cc[USER] lib/printfmt.c
++ cc[USER] lib/readline.c
++ cc[USER] lib/string.c
++ cc[USER] lib/syscall.c
++ cc[USER] lib/pgfault.c
++ as[USER] lib/pfentry.S
++ cc[USER] lib/fork.c
++ cc[USER] lib/ipc.c
++ cc[USER] lib/args.c
++ cc[USER] lib/fd.c
++ cc[USER] lib/file.c
++ cc[USER] lib/fprintf.c
++ cc[USER] lib/pageref.c
++ cc[USER] lib/spawn.c
++ cc[USER] lib/pipe.c
++ cc[USER] lib/wait.c
++ ar obj/lib/libjos.a
++ cc[USER] user/hello.c
++ ld obj/user/hello
++ cc[USER] user/buggyhello.c
++ ld obj/user/buggyhello
++ cc[USER] user/buggyhello2.c
++ ld obj/user/buggyhello2
++ cc[USER] user/evilhello.c
++ ld obj/user/evilhello
++ cc[USER] user/testbss.c
++ ld obj/user/testbss
++ cc[USER] user/divzero.c
++ ld obj/user/divzero
++ cc[USER] user/breakpoint.c
++ ld obj/user/breakpoint
++ cc[USER] user/softint.c
++ ld obj/user/softint
++ cc[USER] user/badsegment.c
++ ld obj/user/badsegment
++ cc[USER] user/faultread.c
++ ld obj/user/faultread
++ cc[USER] user/faultreadkernel.c
++ ld obj/user/faultreadkernel
++ cc[USER] user/faultwrite.c
++ ld obj/user/faultwrite
++ cc[USER] user/faultwritekernel.c
++ ld obj/user/faultwritekernel
++ cc[USER] user/idle.c
++ ld obj/user/idle
++ cc[USER] user/yield.c
++ ld obj/user/yield
++ cc[USER] user/dumbfork.c
++ ld obj/user/dumbfork
++ cc[USER] user/stresssched.c
++ ld obj/user/stresssched
++ cc[USER] user/faultdie.c
++ ld obj/user/faultdie
++ cc[USER] user/faultregs.c
++ ld obj/user/faultregs
++ cc[USER] user/faultalloc.c
++ ld obj/user/faultalloc
++ cc[USER] user/faultallocbad.c
++ ld obj/user/faultallocbad
++ cc[USER] user/faultnostack.c
++ ld obj/user/faultnostack
++ cc[USER] user/faultbadhandler.c
++ ld obj/user/faultbadhandler
++ cc[USER] user/faultevilhandler.c
++ ld obj/user/faultevilhandler
++ cc[USER] user/forktree.c
++ ld obj/user/forktree
++ cc[USER] user/sendpage.c
++ ld obj/user/sendpage
++ cc[USER] user/spin.c
++ ld obj/user/spin
++ cc[USER] user/spin0.c
++ ld obj/user/spin0
++ cc[USER] user/fairness.c
++ ld obj/user/fairness
++ cc[USER] user/pingpong.c
++ ld obj/user/pingpong
++ cc[USER] user/pingpongs.c
++ ld obj/user/pingpongs
++ cc[USER] user/primes.c
++ ld obj/user/primes
++ cc[USER] user/faultio.c
++ ld obj/user/faultio
++ cc[USER] user/spawnfaultio.c
++ ld obj/user/spawnfaultio
++ cc[USER] user/testfile.c
++ ld obj/user/testfile
++ cc[USER] user/spawnhello.c
++ ld obj/user/spawnhello
++ cc[USER] user/icode.c
++ ld obj/user/icode
++ cc[USER] fs/ide.c
++ cc[USER] fs/bc.c
++ cc[USER] fs/fs.c
++ cc[USER] fs/serv.c
++ cc[USER] fs/test.c
++ ld obj/fs/fs
++ cc[USER] user/testpteshare.c
++ ld obj/user/testpteshare
++ cc[USER] user/testfdsharing.c
++ ld obj/user/testfdsharing
++ cc[USER] user/testpipe.c
++ ld obj/user/testpipe
++ cc[USER] user/testpiperace.c
++ ld obj/user/testpiperace
++ cc[USER] user/testpiperace2.c
++ ld obj/user/testpiperace2
++ cc[USER] user/primespipe.c
++ ld obj/user/primespipe
++ cc[USER] user/testkbd.c
++ ld obj/user/testkbd
++ cc[USER] user/testshell.c
++ ld obj/user/testshell
++ ld obj/kern/kernel
++ as boot/boot.S
++ cc -Os boot/main.c
++ ld boot/boot
++ mk obj/kern/kernel.img
++ mk obj/fs/fsformat
++ cc[USER] user/init.c
++ ld obj/user/init
++ cc[USER] user/cat.c
++ ld obj/user/cat
++ cc[USER] user/echo.c
++ ld obj/user/echo
++ cc[USER] user/ls.c
++ ld obj/user/ls
++ cc[USER] user/lsfd.c
++ ld obj/user/lsfd
++ cc[USER] user/num.c
++ ld obj/user/num
++ cc[USER] user/sh.c
++ ld obj/user/sh
++ mk obj/fs/clean-fs.img
++ cp obj/fs/clean-fs.img obj/fs/fs.img
+make[1]: Leaving directory '/home/ntorresdalmas/Desktop/sisop/tp/7508_tp'
+internal FS tests [fs/test.c]: OK (2.1s) 
+  fs i/o: OK 
+  check_bc: OK 
+  check_super: OK 
+  check_bitmap: OK 
+  alloc_block: OK 
+  file_open: OK 
+  file_get_block: OK 
+  file_flush/file_truncate/file rewrite: FAIL 
+    AssertionError: ...
+         file_open is good
+         file_get_block is good
+    GOOD file_flush is good
+    GOOD file_truncate is good
+         [00001000] user panic in fs at fs/test.c:64: assertion failed: !(uvpt[PGNUM(blk)] & PTE_D)
+         Welcome to the JOS kernel monitor!
+    ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2019 (make)
+    MISSING 'file rewrite is good'
+    
+testfile: OK (1.0s) 
+  serve_open/file_stat/file_close: FAIL 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
+    MISSING 'serve_open is good'
+    MISSING 'file_stat is good'
+    MISSING 'file_close is good'
+    MISSING 'stale fileid is good'
+    
+  file_read: FAIL 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
+    MISSING 'file_read is good'
+    
+  file_write: FAIL 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
+    MISSING 'file_write is good'
+    
+  file_read after file_write: FAIL 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
+    MISSING 'file_read after file_write is good'
+    
+  open: FAIL 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
+    MISSING 'open is good'
+    
+  large file: FAIL 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
+    MISSING 'large file is good'
+    
+spawn via spawnhello: FAIL (1.1s) 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2205 (make)
+    MISSING 'i am parent environment 00001001'
+    MISSING 'hello, world'
+    MISSING 'i am environment 00001002'
+    MISSING 'No runnable environments in the system!'
+    
+    QEMU output saved to jos.out.spawn
+Protection I/O space: OK (0.9s) 
+PTE_SHARE [testpteshare]: FAIL (1.8s) 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2413 (make)
+    MISSING 'fork handles PTE_SHARE right'
+    MISSING 'spawn handles PTE_SHARE right'
+    
+    QEMU output saved to jos.out.pte_share
+PTE_SHARE [testfdsharing]: FAIL (2.2s) 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2516 (make)
+    MISSING 'read in child succeeded'
+    MISSING 'read in parent succeeded'
+    
+    QEMU output saved to jos.out.fd_share
+start the shell [icode]: FAIL (1.9s) 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2619 (make)
+    MISSING 'icode: read /motd'
+    MISSING 'This is /motd, the message of the day.'
+    MISSING 'icode: spawn /init'
+    MISSING 'init: running'
+    MISSING 'init: data seems okay'
+    MISSING 'icode: exiting'
+    MISSING 'init: bss seems okay'
+    MISSING 'init: args: 'init' 'initarg1' 'initarg2''
+    MISSING 'init: running sh'
+    MISSING '\$ '
+    
+    QEMU output saved to jos.out.icode
+testshell: FAIL (1.9s) 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2722 (make)
+    MISSING 'shell ran correctly'
+    
+    QEMU output saved to jos.out.testshell
+primespipe: FAIL (3.8s) 
+    AssertionError: ...
+           cs   0x----001b
+           flag 0x00003086
+           esp  0xeebfdf78
+           ss   0x----0023
+         qemu-system-i386: terminating on signal 15 from pid 2825 (make)
+    MISSING '2$'
+    MISSING '3$'
+    MISSING '5$'
+    MISSING '7$'
+    MISSING '521$'
+    MISSING '11$'
+    MISSING '523$'
+    MISSING '13$'
+    MISSING '17$'
+    MISSING '19$'
+    MISSING '23$'
+    MISSING '29$'
+    MISSING '541$'
+    MISSING '31$'
+    MISSING '547$'
+    MISSING '37$'
+    MISSING '41$'
+    MISSING '43$'
+    MISSING '557$'
+    MISSING '47$'
+    MISSING '563$'
+    MISSING '53$'
+    MISSING '569$'
+    MISSING '59$'
+    MISSING '571$'
+    MISSING '61$'
+    MISSING '577$'
+    MISSING '67$'
+    MISSING '71$'
+    MISSING '73$'
+    MISSING '587$'
+    MISSING '79$'
+    MISSING '593$'
+    MISSING '83$'
+    MISSING '599$'
+    MISSING '89$'
+    MISSING '601$'
+    MISSING '607$'
+    MISSING '97$'
+    MISSING '101$'
+    MISSING '613$'
+    MISSING '103$'
+    MISSING '617$'
+    MISSING '107$'
+    MISSING '619$'
+    MISSING '109$'
+    MISSING '113$'
+    MISSING '631$'
+    MISSING '127$'
+    MISSING '641$'
+    MISSING '131$'
+    MISSING '643$'
+    MISSING '647$'
+    MISSING '137$'
+    MISSING '139$'
+    MISSING '653$'
+    MISSING '659$'
+    MISSING '149$'
+    MISSING '661$'
+    MISSING '151$'
+    MISSING '157$'
+    MISSING '673$'
+    MISSING '163$'
+    MISSING '677$'
+    MISSING '167$'
+    MISSING '683$'
+    MISSING '173$'
+    MISSING '179$'
+    MISSING '691$'
+    MISSING '181$'
+    MISSING '701$'
+    MISSING '191$'
+    MISSING '193$'
+    MISSING '197$'
+    MISSING '709$'
+    MISSING '199$'
+    MISSING '719$'
+    MISSING '211$'
+    MISSING '727$'
+    MISSING '733$'
+    MISSING '223$'
+    MISSING '227$'
+    MISSING '739$'
+    MISSING '229$'
+    MISSING '743$'
+    MISSING '233$'
+    MISSING '239$'
+    MISSING '751$'
+    MISSING '241$'
+    MISSING '757$'
+    MISSING '761$'
+    MISSING '251$'
+    MISSING '257$'
+    MISSING '769$'
+    MISSING '773$'
+    MISSING '263$'
+    MISSING '269$'
+    MISSING '271$'
+    MISSING '787$'
+    MISSING '277$'
+    MISSING '281$'
+    MISSING '283$'
+    MISSING '797$'
+    MISSING '293$'
+    MISSING '809$'
+    MISSING '811$'
+    MISSING '307$'
+    MISSING '821$'
+    MISSING '311$'
+    MISSING '823$'
+    MISSING '313$'
+    MISSING '827$'
+    MISSING '317$'
+    MISSING '829$'
+    MISSING '839$'
+    MISSING '331$'
+    MISSING '337$'
+    MISSING '853$'
+    MISSING '857$'
+    MISSING '347$'
+    MISSING '859$'
+    MISSING '349$'
+    MISSING '863$'
+    MISSING '353$'
+    MISSING '359$'
+    MISSING '877$'
+    MISSING '367$'
+    MISSING '881$'
+    MISSING '883$'
+    MISSING '373$'
+    MISSING '887$'
+    MISSING '379$'
+    MISSING '383$'
+    MISSING '389$'
+    MISSING '907$'
+    MISSING '397$'
+    MISSING '911$'
+    MISSING '401$'
+    MISSING '919$'
+    MISSING '409$'
+    MISSING '929$'
+    MISSING '419$'
+    MISSING '421$'
+    MISSING '937$'
+    MISSING '941$'
+    MISSING '431$'
+    MISSING '433$'
+    MISSING '947$'
+    MISSING '439$'
+    MISSING '953$'
+    MISSING '443$'
+    MISSING '449$'
+    MISSING '967$'
+    MISSING '457$'
+    MISSING '971$'
+    MISSING '461$'
+    MISSING '463$'
+    MISSING '977$'
+    MISSING '467$'
+    MISSING '983$'
+    MISSING '479$'
+    MISSING '991$'
+    MISSING '997$'
+    MISSING '487$'
+    MISSING '491$'
+    MISSING '499$'
+    MISSING '503$'
+    MISSING '509$'
+    
+    QEMU output saved to jos.out.primespipe
+Score: 55/150
+GNUmakefile:203: recipe for target 'grade' failed

@@ -226,6 +226,8 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 		}
 		// Me guardo la direccion del nuevo bloque en disco
 		*blk = diskaddr(blockno);
+		// Guardo el nuevo bloque en pdiskbno.
+		*pdiskbno = blockno;
 	} else {
 		// Me guardo la direccion del bloque obtenido por file_block_walk
 		*blk = diskaddr(*pdiskbno);

@@ -323,5 +323,28 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+
+	bool is_maped, is_shareable;
+	int va;
+	for (va=0; va<UTOP; va+=PGSIZE) {
+		// Obtengo la direccion del page directory entry
+		pde_t actual_pde = uvpd[PDX(va)];
+		// Si tiene el bit de presencia --> hay una pagina mapeada
+		is_maped = (actual_pde & PTE_P);
+
+		if (is_maped) {
+			// Obtengo la direccion del page table entry
+			pte_t actual_pte = uvpt[PGNUM(va)];
+			// Si tiene el bit de presencia --> hay una pagina mapeada
+			is_maped = (actual_pte & PTE_P);
+			// Si tiene el bit de compartir --> la comparto con el hijo
+			is_shareable = (actual_pte & PTE_SHARE);
+			
+			if (is_maped && is_shareable) {
+				sys_page_map(0, (void *) va, child, (void *) va, actual_pte | PTE_SYSCALL);
+			}
+		}
+	}
+
 	return 0;
 }

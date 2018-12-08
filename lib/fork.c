@@ -105,6 +105,14 @@ duppage(envid_t envid, unsigned pn)
 		child_perm &= ~PTE_W;
 		child_perm |= PTE_COW;
 	}
+
+	// Si el padre tiene activado PTE_SHARE, se mantienen los permisos del padre
+	// Lo de arriba (is_writeable) queda en desuso
+	bool is_shareable = (father_perm & PTE_SHARE);
+	if (is_shareable) {
+		child_perm = father_perm;
+	}
+
 	// Mapeo en el hijo la pagina fisica en la misma va
 	int r;
 	if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) < 0) {

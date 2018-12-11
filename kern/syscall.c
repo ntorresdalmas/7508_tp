@@ -157,10 +157,10 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 		return -E_BAD_ENV;
 	}
 
-	// TODO: falta que chequear que tf apunte a memoria de usuario valida
-	// if (tf->tf_esp ...) {
-	//		return -E_INVAL
-	// }
+	// Chequeo que tf apunte a memoria de usuario valida
+	uintptr_t stack_top = tf->tf_esp;
+	uintptr_t stack_bottom = stack_top - sizeof(struct Trapframe);
+	user_mem_assert(e, (const void *) stack_bottom, sizeof(struct Trapframe), PTE_U | PTE_P | PTE_W);
 
 	// Seteo el trapframe del proceso en tf
 	e->env_tf = *tf;

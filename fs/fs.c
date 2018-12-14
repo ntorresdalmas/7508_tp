@@ -79,7 +79,7 @@ alloc_block(void)
 				panic("sys_page_alloc: %e", r);
 			}
 			// Actualizo el bitmap (1: libre --> 0: ocupado)
-			bitmap[i / 32] &= 0 << (i % 32);
+			bitmap[i / 32] &= ~(1 << (i % 32));
 			// Cargo el bitmap actualizado al disco
 			flush_block(bitmap);
 			// Devuelvo el numero de bloque

@@ -50,7 +50,7 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
-	
+
 	// Alineo addr a BLKSIZE
 	addr = ROUNDDOWN(addr, BLKSIZE);
 	// Numero de sector
@@ -59,7 +59,7 @@ bc_pgfault(struct UTrapframe *utf)
 	size_t nsecs = BLKSECTS;
 
 	// Reservo una nueva pagina
-	if ((r = sys_page_alloc(0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
+	if ((r = sys_page_alloc(0, addr, PTE_P | PTE_U | PTE_W)) < 0) {
 		panic("sys_page_alloc: %e", r);
 	}
 	// Leo el contenido de disco y lo cargo en la nueva pagina (disco --> addr)
@@ -96,8 +96,8 @@ flush_block(void *addr)
 		panic("flush_block of bad va %08x", addr);
 
 	// LAB 5: Your code here.
-	//panic("flush_block not implemented");
-	
+	// panic("flush_block not implemented");
+
 	int r;
 
 	// Alineo addr a BLKSIZE
@@ -107,7 +107,7 @@ flush_block(void *addr)
 	bool va_mapped = va_is_mapped(addr);
 	// La va esta dirty
 	bool va_dirty = va_is_dirty(addr);
-	
+
 	if (va_mapped && va_dirty) {
 		// Numero de sector
 		uint32_t secno = blockno * BLKSECTS;
@@ -119,7 +119,9 @@ flush_block(void *addr)
 			panic("ide_write: %e", r);
 		}
 		// Limpio el bit dirty (lo pongo en 0)
-		if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) {
+		if ((r = sys_page_map(
+		             0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) <
+		    0) {
 			panic("in flush_block, sys_page_map: %e", r);
 		}
 	}

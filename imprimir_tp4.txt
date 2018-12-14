@@ -1,373 +1,1584 @@
 diff --git a/fs/bc.c b/fs/bc.c
-index ec59cfb..747ea80 100644
+index 747ea80..21b2220 100644
 --- a/fs/bc.c
 +++ b/fs/bc.c
-@@ -50,6 +50,22 @@ bc_pgfault(struct UTrapframe *utf)
+@@ -50,7 +50,7 @@ bc_pgfault(struct UTrapframe *utf)
  	// the disk.
  	//
  	// LAB 5: you code here:
-+	
-+	// Alineo addr a BLKSIZE
-+	addr = ROUNDDOWN(addr, BLKSIZE);
-+	// Numero de sector
-+	uint32_t secno = blockno * BLKSECTS;
-+	// Sectores a leer
-+	size_t nsecs = BLKSECTS;
+-	
 +
-+	// Reservo una nueva pagina
-+	if ((r = sys_page_alloc(0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
-+		panic("sys_page_alloc: %e", r);
-+	}
-+	// Leo el contenido de disco y lo cargo en la nueva pagina (disco --> addr)
-+	if ((r = ide_read(secno, addr, nsecs)) < 0) {
-+		panic("ide_read: %e", r);
-+	}
+ 	// Alineo addr a BLKSIZE
+ 	addr = ROUNDDOWN(addr, BLKSIZE);
+ 	// Numero de sector
+@@ -59,7 +59,7 @@ bc_pgfault(struct UTrapframe *utf)
+ 	size_t nsecs = BLKSECTS;
  
- 	// Clear the dirty bit for the disk block page since we just read the
- 	// block from disk
-@@ -80,7 +96,33 @@ flush_block(void *addr)
+ 	// Reservo una nueva pagina
+-	if ((r = sys_page_alloc(0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
++	if ((r = sys_page_alloc(0, addr, PTE_P | PTE_U | PTE_W)) < 0) {
+ 		panic("sys_page_alloc: %e", r);
+ 	}
+ 	// Leo el contenido de disco y lo cargo en la nueva pagina (disco --> addr)
+@@ -96,8 +96,8 @@ flush_block(void *addr)
  		panic("flush_block of bad va %08x", addr);
  
  	// LAB 5: Your code here.
--	panic("flush_block not implemented");
-+	//panic("flush_block not implemented");
-+	
-+	int r;
+-	//panic("flush_block not implemented");
+-	
++	// panic("flush_block not implemented");
 +
-+	// Alineo addr a BLKSIZE
-+	addr = ROUNDDOWN(addr, BLKSIZE);
-+
-+	// La va esta mapeada (es decir, esta en el block cache)
-+	bool va_mapped = va_is_mapped(addr);
-+	// La va esta dirty
-+	bool va_dirty = va_is_dirty(addr);
-+	
-+	if (va_mapped && va_dirty) {
-+		// Numero de sector
-+		uint32_t secno = blockno * BLKSECTS;
-+		// Sectores a leer
-+		size_t nsecs = BLKSECTS;
-+
-+		// Escribo el contenido en el disco (addr --> disco)
-+		if ((r = ide_write(secno, addr, nsecs)) < 0) {
-+			panic("ide_write: %e", r);
-+		}
-+		// Limpio el bit dirty (lo pongo en 0)
-+		if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) {
-+			panic("in flush_block, sys_page_map: %e", r);
-+		}
-+	}
- }
+ 	int r;
  
- // Test that the block cache works, by smashing the superblock and
+ 	// Alineo addr a BLKSIZE
+@@ -107,7 +107,7 @@ flush_block(void *addr)
+ 	bool va_mapped = va_is_mapped(addr);
+ 	// La va esta dirty
+ 	bool va_dirty = va_is_dirty(addr);
+-	
++
+ 	if (va_mapped && va_dirty) {
+ 		// Numero de sector
+ 		uint32_t secno = blockno * BLKSECTS;
+@@ -119,7 +119,9 @@ flush_block(void *addr)
+ 			panic("ide_write: %e", r);
+ 		}
+ 		// Limpio el bit dirty (lo pongo en 0)
+-		if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) {
++		if ((r = sys_page_map(
++		             0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) <
++		    0) {
+ 			panic("in flush_block, sys_page_map: %e", r);
+ 		}
+ 	}
 diff --git a/fs/fs.c b/fs/fs.c
-index 875f451..7bb3113 100644
+index 6bffcdd..9d287c4 100644
 --- a/fs/fs.c
 +++ b/fs/fs.c
-@@ -62,7 +62,30 @@ alloc_block(void)
+@@ -62,8 +62,8 @@ alloc_block(void)
  	// super->s_nblocks blocks in the disk altogether.
  
  	// LAB 5: Your code here.
--	panic("alloc_block not implemented");
-+	//panic("alloc_block not implemented");
-+	
-+	int r;
+-	//panic("alloc_block not implemented");
+-	
++	// panic("alloc_block not implemented");
 +
-+	// Recorro todos los bloques del disco y chequedo c/u en el bitmap
-+	// en busca del primero libre. Tener en cuenta:
-+	// blockno = 0 --> boot block
-+	// blockno = 1 --> super block
-+	// blockno = 2 --> bitmap
-+	int i;
-+	for (i = 0; i < super->s_nblocks; i++) {
-+		if (block_is_free(i)) {
-+			// Reservo una nueva pagina para el bloque
-+			if ((r = sys_page_alloc(0, diskaddr(i), PTE_P|PTE_U|PTE_W)) < 0) {
-+				panic("sys_page_alloc: %e", r);
-+			}
-+			// Actualizo el bitmap (1: libre --> 0: ocupado)
-+			bitmap[i / 32] &= 0 << (i % 32);
-+			// Cargo el bitmap actualizado al disco
-+			flush_block(bitmap);
-+			// Devuelvo el numero de bloque
-+			return i;
-+		}
-+	}
- 	return -E_NO_DISK;
- }
+ 	int r;
  
-@@ -133,7 +156,42 @@ static int
+ 	// Recorro todos los bloques del disco y chequedo c/u en el bitmap
+@@ -75,7 +75,8 @@ alloc_block(void)
+ 	for (i = 0; i < super->s_nblocks; i++) {
+ 		if (block_is_free(i)) {
+ 			// Reservo una nueva pagina para el bloque
+-			if ((r = sys_page_alloc(0, diskaddr(i), PTE_P|PTE_U|PTE_W)) < 0) {
++			if ((r = sys_page_alloc(
++			             0, diskaddr(i), PTE_P | PTE_U | PTE_W)) < 0) {
+ 				panic("sys_page_alloc: %e", r);
+ 			}
+ 			// Actualizo el bitmap (1: libre --> 0: ocupado)
+@@ -156,7 +157,7 @@ static int
  file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
  {
  	// LAB 5: Your code here.
--	panic("file_block_walk not implemented");
-+	//panic("file_block_walk not implemented");
-+
-+	if (filebno >= NDIRECT + NINDIRECT) {
-+		return -E_INVAL;
-+	}
-+	// Bloques directos
-+	if (filebno < NDIRECT) {
-+		// Me guardo la direccion si esta alocado el bloque, 0 en caso contrario
-+		*ppdiskbno = &f->f_direct[filebno];
-+	} else {
-+	// Bloques indirectos
-+		// No hay bloque indirecto alocado
-+		if (f->f_indirect == 0) {
-+			if (!alloc) {
-+				return -E_NOT_FOUND;
-+			}
-+			// Reservo un bloque nuevo
-+			int blockno;
-+			if ((blockno = alloc_block()) < 0) {
-+				return blockno;
-+			}
-+			// Lo guardo en el bloque indirecto
-+			f->f_indirect = blockno;
-+			// Limpio el bloque (lo lleno de 0s)
-+			memset(diskaddr(f->f_indirect), 0, BLKSIZE);
-+		}
-+		uint32_t *indirect;
-+		// Apunto indirect al principio del bloque de indirectos
-+		indirect = diskaddr(f->f_indirect);
-+		// Muevo indirect al bloque correspondiente dentro del indirecto
-+		indirect += (filebno - NDIRECT);
-+		// Me guardo la direccion
-+		*ppdiskbno = indirect;
-+	}
-+
-+	return 0;
- }
+-	//panic("file_block_walk not implemented");
++	// panic("file_block_walk not implemented");
  
- // Set *blk to the address in memory where the filebno'th
-@@ -148,7 +206,32 @@ int
+ 	if (filebno >= NDIRECT + NINDIRECT) {
+ 		return -E_INVAL;
+@@ -166,7 +167,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
+ 		// Me guardo la direccion del bloque
+ 		*ppdiskbno = &f->f_direct[filebno];
+ 	} else {
+-	// Bloques indirectos
++		// Bloques indirectos
+ 		// No hay bloque indirecto alocado
+ 		if (f->f_indirect == 0) {
+ 			if (!alloc) {
+@@ -206,7 +207,7 @@ int
  file_get_block(struct File *f, uint32_t filebno, char **blk)
  {
  	// LAB 5: Your code here.
--	panic("file_get_block not implemented");
-+	//panic("file_get_block not implemented");
-+
-+	if (filebno >= NDIRECT + NINDIRECT) {
-+		return -E_INVAL;
-+	}
-+	// Obtengo el numero de bloque en disco para 'filebno' y lo guardo en 'pdiskbno'
-+	uint32_t *pdiskbno;
-+	int r;
-+	if ((r = file_block_walk(f, filebno, &pdiskbno, 1)) < 0) {
-+		return r;
-+	}
-+	// No hay bloque en el file
-+	if (*pdiskbno == 0) {
-+		// Reservo un bloque nuevo
-+		int blockno;
-+		if ((blockno = alloc_block()) < 0) {
-+			return -E_NO_DISK;
-+		}
-+		// Me guardo la direccion del nuevo bloque en disco
-+		*blk = diskaddr(blockno);
-+	} else {
-+		// Me guardo la direccion del bloque obtenido por file_block_walk
-+		*blk = diskaddr(*pdiskbno);
-+	}
-+
-+	return 0;
- }
+-	//panic("file_get_block not implemented");
++	// panic("file_get_block not implemented");
  
- // Try to find a file named "name" in dir.  If so, set *file to it.
+ 	if (filebno >= NDIRECT + NINDIRECT) {
+ 		return -E_INVAL;
 diff --git a/fs/serv.c b/fs/serv.c
-index f38153b..0564fc4 100644
+index 4c589f8..6001699 100644
 --- a/fs/serv.c
 +++ b/fs/serv.c
-@@ -222,7 +222,39 @@ serve_read(envid_t envid, union Fsipc *ipc)
- 		        req->req_n);
- 
- 	// Lab 5: Your code here:
--	return 0;
-+
-+	struct OpenFile *o;
-+	int r;
-+	// Me guardo el openfile en o.
-+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
-+		return r;
-+	}
-+	struct Fd* fd = o->o_fd;
-+	// Offset (seek) en el archivo
-+	off_t offset = fd->fd_offset;
-+	// Archivo actual
-+	struct File* f = o->o_file;
-+	// Tamanio del archivo en bytes
-+	off_t file_size = f->f_size;
-+	// Bytes a leer
-+	size_t bytes_req = req->req_n;
-+	// Calculo la cantidad de bytes reales que va a leer file_read()
-+	size_t bytes_to_read = MIN(bytes_req, file_size - offset);
-+
-+	// Si los bytes a leer superan el tamanio del buffer, los limito
-+	if (bytes_to_read > PGSIZE) {
-+		bytes_to_read = PGSIZE;
-+	}
-+
-+	// Me devuelve la # de bytes leidos a partir del offset
-+	int bytes_read;
-+	if ((bytes_read = file_read(f, ret->ret_buf, bytes_to_read, offset)) < 0){
-+		return bytes_read;
-+	}
-+	// Actualizo el offset (seek) segun los bytes leidos
-+	fd->fd_offset += bytes_read;
-+
-+	return bytes_read;
- }
- 
- 
-@@ -240,7 +272,33 @@ serve_write(envid_t envid, struct Fsreq_write *req)
+@@ -226,15 +226,15 @@ serve_read(envid_t envid, union Fsipc *ipc)
+ 	struct OpenFile *o;
+ 	int r;
+ 	// Me guardo el openfile en o
+-	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
++	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0) {
+ 		return r;
+ 	}
+ 	// File Descriptor
+-	struct Fd* fd = o->o_fd;
++	struct Fd *fd = o->o_fd;
+ 	// Offset (seek) en el archivo
+ 	off_t offset = fd->fd_offset;
+ 	// Archivo actual
+-	struct File* file = o->o_file;
++	struct File *file = o->o_file;
+ 	// Tamaño del archivo en bytes
+ 	off_t file_size = file->f_size;
+ 	// Bytes a leer
+@@ -250,7 +250,8 @@ serve_read(envid_t envid, union Fsipc *ipc)
+ 	// Leo 'bytes to read' bytes a partir del offset (file --> ret_buf)
+ 	// La cantidad leida me queda en 'bytes_read'
+ 	int bytes_read;
+-	if ((bytes_read = file_read(file, ret->ret_buf, bytes_to_read, offset)) < 0){
++	if ((bytes_read = file_read(file, ret->ret_buf, bytes_to_read, offset)) <
++	    0) {
+ 		return bytes_read;
+ 	}
+ 	// Actualizo el offset (seek) segun los bytes leidos
+@@ -274,20 +275,20 @@ serve_write(envid_t envid, struct Fsreq_write *req)
  		        req->req_n);
  
  	// LAB 5: Your code here.
--	panic("serve_write not implemented");
-+	//panic("serve_write not implemented");
-+
-+	struct OpenFile *o;
-+	int r;
-+	// Me guardo el openfile en o.
-+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
-+		return r;
-+	}
-+	struct Fd* fd = o->o_fd;
-+	// Offset (seek) en el archivo
-+	off_t offset = fd->fd_offset;
-+	// Archivo actual
-+	struct File* f = o->o_file;
-+	// Tamanio del archivo en bytes
-+	off_t file_size = f->f_size;
-+
-+	size_t bytes_to_write = req->req_n;
-+
-+	// 
-+	int bytes_written;
-+	if ((bytes_written = file_write(f, req->req_buf, bytes_to_write, offset)) < 0){
-+		return bytes_written;
-+	}
-+
-+	fd->fd_offset += bytes_written;
-+
-+	return bytes_written;
- }
+-	//panic("serve_write not implemented");
++	// panic("serve_write not implemented");
  
- // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
+ 	struct OpenFile *o;
+ 	int r;
+ 	// Me guardo el openfile en o.
+-	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
++	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0) {
+ 		return r;
+ 	}
+ 	// File Descriptor
+-	struct Fd* fd = o->o_fd;
++	struct Fd *fd = o->o_fd;
+ 	// Offset (seek) en el archivo
+ 	off_t offset = fd->fd_offset;
+ 	// Archivo actual
+-	struct File* file = o->o_file;
++	struct File *file = o->o_file;
+ 	// Tamaño del archivo en bytes
+ 	off_t file_size = file->f_size;
+ 	// Cantidad de bytes a escribir
+@@ -296,7 +297,8 @@ serve_write(envid_t envid, struct Fsreq_write *req)
+ 	// Escribo 'bytes to write' bytes a partir del offset (ret_buf --> file)
+ 	// La cantidad escrita me queda en 'bytes_written'
+ 	int bytes_written;
+-	if ((bytes_written = file_write(file, req->req_buf, bytes_to_write, offset)) < 0){
++	if ((bytes_written =
++	             file_write(file, req->req_buf, bytes_to_write, offset)) < 0) {
+ 		return bytes_written;
+ 	}
+ 
+diff --git a/imprimir_tp4.txt b/imprimir_tp4.txt
+index 4b2d829..12cfd8a 100644
+--- a/imprimir_tp4.txt
++++ b/imprimir_tp4.txt
+@@ -1,866 +0,0 @@
+-diff --git a/fs/bc.c b/fs/bc.c
+-index ec59cfb..747ea80 100644
+---- a/fs/bc.c
+-+++ b/fs/bc.c
+-@@ -50,6 +50,22 @@ bc_pgfault(struct UTrapframe *utf)
+- 	// the disk.
+- 	//
+- 	// LAB 5: you code here:
+-+	
+-+	// Alineo addr a BLKSIZE
+-+	addr = ROUNDDOWN(addr, BLKSIZE);
+-+	// Numero de sector
+-+	uint32_t secno = blockno * BLKSECTS;
+-+	// Sectores a leer
+-+	size_t nsecs = BLKSECTS;
+-+
+-+	// Reservo una nueva pagina
+-+	if ((r = sys_page_alloc(0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
+-+		panic("sys_page_alloc: %e", r);
+-+	}
+-+	// Leo el contenido de disco y lo cargo en la nueva pagina (disco --> addr)
+-+	if ((r = ide_read(secno, addr, nsecs)) < 0) {
+-+		panic("ide_read: %e", r);
+-+	}
+- 
+- 	// Clear the dirty bit for the disk block page since we just read the
+- 	// block from disk
+-@@ -80,7 +96,33 @@ flush_block(void *addr)
+- 		panic("flush_block of bad va %08x", addr);
+- 
+- 	// LAB 5: Your code here.
+--	panic("flush_block not implemented");
+-+	//panic("flush_block not implemented");
+-+	
+-+	int r;
+-+
+-+	// Alineo addr a BLKSIZE
+-+	addr = ROUNDDOWN(addr, BLKSIZE);
+-+
+-+	// La va esta mapeada (es decir, esta en el block cache)
+-+	bool va_mapped = va_is_mapped(addr);
+-+	// La va esta dirty
+-+	bool va_dirty = va_is_dirty(addr);
+-+	
+-+	if (va_mapped && va_dirty) {
+-+		// Numero de sector
+-+		uint32_t secno = blockno * BLKSECTS;
+-+		// Sectores a leer
+-+		size_t nsecs = BLKSECTS;
+-+
+-+		// Escribo el contenido en el disco (addr --> disco)
+-+		if ((r = ide_write(secno, addr, nsecs)) < 0) {
+-+			panic("ide_write: %e", r);
+-+		}
+-+		// Limpio el bit dirty (lo pongo en 0)
+-+		if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) {
+-+			panic("in flush_block, sys_page_map: %e", r);
+-+		}
+-+	}
+- }
+- 
+- // Test that the block cache works, by smashing the superblock and
+-diff --git a/fs/fs.c b/fs/fs.c
+-index 875f451..7bb3113 100644
+---- a/fs/fs.c
+-+++ b/fs/fs.c
+-@@ -62,7 +62,30 @@ alloc_block(void)
+- 	// super->s_nblocks blocks in the disk altogether.
+- 
+- 	// LAB 5: Your code here.
+--	panic("alloc_block not implemented");
+-+	//panic("alloc_block not implemented");
+-+	
+-+	int r;
+-+
+-+	// Recorro todos los bloques del disco y chequedo c/u en el bitmap
+-+	// en busca del primero libre. Tener en cuenta:
+-+	// blockno = 0 --> boot block
+-+	// blockno = 1 --> super block
+-+	// blockno = 2 --> bitmap
+-+	int i;
+-+	for (i = 0; i < super->s_nblocks; i++) {
+-+		if (block_is_free(i)) {
+-+			// Reservo una nueva pagina para el bloque
+-+			if ((r = sys_page_alloc(0, diskaddr(i), PTE_P|PTE_U|PTE_W)) < 0) {
+-+				panic("sys_page_alloc: %e", r);
+-+			}
+-+			// Actualizo el bitmap (1: libre --> 0: ocupado)
+-+			bitmap[i / 32] &= 0 << (i % 32);
+-+			// Cargo el bitmap actualizado al disco
+-+			flush_block(bitmap);
+-+			// Devuelvo el numero de bloque
+-+			return i;
+-+		}
+-+	}
+- 	return -E_NO_DISK;
+- }
+- 
+-@@ -133,7 +156,42 @@ static int
+- file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
+- {
+- 	// LAB 5: Your code here.
+--	panic("file_block_walk not implemented");
+-+	//panic("file_block_walk not implemented");
+-+
+-+	if (filebno >= NDIRECT + NINDIRECT) {
+-+		return -E_INVAL;
+-+	}
+-+	// Bloques directos
+-+	if (filebno < NDIRECT) {
+-+		// Me guardo la direccion si esta alocado el bloque, 0 en caso contrario
+-+		*ppdiskbno = &f->f_direct[filebno];
+-+	} else {
+-+	// Bloques indirectos
+-+		// No hay bloque indirecto alocado
+-+		if (f->f_indirect == 0) {
+-+			if (!alloc) {
+-+				return -E_NOT_FOUND;
+-+			}
+-+			// Reservo un bloque nuevo
+-+			int blockno;
+-+			if ((blockno = alloc_block()) < 0) {
+-+				return blockno;
+-+			}
+-+			// Lo guardo en el bloque indirecto
+-+			f->f_indirect = blockno;
+-+			// Limpio el bloque (lo lleno de 0s)
+-+			memset(diskaddr(f->f_indirect), 0, BLKSIZE);
+-+		}
+-+		uint32_t *indirect;
+-+		// Apunto indirect al principio del bloque de indirectos
+-+		indirect = diskaddr(f->f_indirect);
+-+		// Muevo indirect al bloque correspondiente dentro del indirecto
+-+		indirect += (filebno - NDIRECT);
+-+		// Me guardo la direccion
+-+		*ppdiskbno = indirect;
+-+	}
+-+
+-+	return 0;
+- }
+- 
+- // Set *blk to the address in memory where the filebno'th
+-@@ -148,7 +206,32 @@ int
+- file_get_block(struct File *f, uint32_t filebno, char **blk)
+- {
+- 	// LAB 5: Your code here.
+--	panic("file_get_block not implemented");
+-+	//panic("file_get_block not implemented");
+-+
+-+	if (filebno >= NDIRECT + NINDIRECT) {
+-+		return -E_INVAL;
+-+	}
+-+	// Obtengo el numero de bloque en disco para 'filebno' y lo guardo en 'pdiskbno'
+-+	uint32_t *pdiskbno;
+-+	int r;
+-+	if ((r = file_block_walk(f, filebno, &pdiskbno, 1)) < 0) {
+-+		return r;
+-+	}
+-+	// No hay bloque en el file
+-+	if (*pdiskbno == 0) {
+-+		// Reservo un bloque nuevo
+-+		int blockno;
+-+		if ((blockno = alloc_block()) < 0) {
+-+			return -E_NO_DISK;
+-+		}
+-+		// Me guardo la direccion del nuevo bloque en disco
+-+		*blk = diskaddr(blockno);
+-+	} else {
+-+		// Me guardo la direccion del bloque obtenido por file_block_walk
+-+		*blk = diskaddr(*pdiskbno);
+-+	}
+-+
+-+	return 0;
+- }
+- 
+- // Try to find a file named "name" in dir.  If so, set *file to it.
+-diff --git a/fs/serv.c b/fs/serv.c
+-index f38153b..0564fc4 100644
+---- a/fs/serv.c
+-+++ b/fs/serv.c
+-@@ -222,7 +222,39 @@ serve_read(envid_t envid, union Fsipc *ipc)
+- 		        req->req_n);
+- 
+- 	// Lab 5: Your code here:
+--	return 0;
+-+
+-+	struct OpenFile *o;
+-+	int r;
+-+	// Me guardo el openfile en o.
+-+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
+-+		return r;
+-+	}
+-+	struct Fd* fd = o->o_fd;
+-+	// Offset (seek) en el archivo
+-+	off_t offset = fd->fd_offset;
+-+	// Archivo actual
+-+	struct File* f = o->o_file;
+-+	// Tamanio del archivo en bytes
+-+	off_t file_size = f->f_size;
+-+	// Bytes a leer
+-+	size_t bytes_req = req->req_n;
+-+	// Calculo la cantidad de bytes reales que va a leer file_read()
+-+	size_t bytes_to_read = MIN(bytes_req, file_size - offset);
+-+
+-+	// Si los bytes a leer superan el tamanio del buffer, los limito
+-+	if (bytes_to_read > PGSIZE) {
+-+		bytes_to_read = PGSIZE;
+-+	}
+-+
+-+	// Me devuelve la # de bytes leidos a partir del offset
+-+	int bytes_read;
+-+	if ((bytes_read = file_read(f, ret->ret_buf, bytes_to_read, offset)) < 0){
+-+		return bytes_read;
+-+	}
+-+	// Actualizo el offset (seek) segun los bytes leidos
+-+	fd->fd_offset += bytes_read;
+-+
+-+	return bytes_read;
+- }
+- 
+- 
+-@@ -240,7 +272,33 @@ serve_write(envid_t envid, struct Fsreq_write *req)
+- 		        req->req_n);
+- 
+- 	// LAB 5: Your code here.
+--	panic("serve_write not implemented");
+-+	//panic("serve_write not implemented");
+-+
+-+	struct OpenFile *o;
+-+	int r;
+-+	// Me guardo el openfile en o.
+-+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
+-+		return r;
+-+	}
+-+	struct Fd* fd = o->o_fd;
+-+	// Offset (seek) en el archivo
+-+	off_t offset = fd->fd_offset;
+-+	// Archivo actual
+-+	struct File* f = o->o_file;
+-+	// Tamanio del archivo en bytes
+-+	off_t file_size = f->f_size;
+-+
+-+	size_t bytes_to_write = req->req_n;
+-+
+-+	// 
+-+	int bytes_written;
+-+	if ((bytes_written = file_write(f, req->req_buf, bytes_to_write, offset)) < 0){
+-+		return bytes_written;
+-+	}
+-+
+-+	fd->fd_offset += bytes_written;
+-+
+-+	return bytes_written;
+- }
+- 
+- // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
+-diff --git a/kern/env.c b/kern/env.c
+-index 6853bc8..98ad172 100644
+---- a/kern/env.c
+-+++ b/kern/env.c
+-@@ -437,7 +437,9 @@ env_create(uint8_t *binary, enum EnvType type)
+- 	// If this is the file server (type == ENV_TYPE_FS) give it I/O
+- 	// privileges.
+- 	// LAB 5: Your code here.
+--
+-+	if (type == ENV_TYPE_FS) {
+-+		new_env->env_tf.tf_eflags = FL_IOPL_MASK;
+-+	}
+- }
+- 
+- //
+-diff --git a/lib/file.c b/lib/file.c
+-index f2e0b45..745fe99 100644
+---- a/lib/file.c
+-+++ b/lib/file.c
+-@@ -141,7 +141,17 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
+- 	// remember that write is always allowed to write *fewer*
+- 	// bytes than requested.
+- 	// LAB 5: Your code here
+--	panic("devfile_write not implemented");
+-+	//panic("devfile_write not implemented");
+-+
+-+	int r;
+-+	fsipcbuf.write.req_fileid = fd->fd_file.id;
+-+	fsipcbuf.write.req_n = n;
+-+	if ((r = fsipc(FSREQ_WRITE, NULL)) < 0)
+-+		return r;
+-+	assert(r <= PGSIZE);
+-+	memmove(fsipcbuf.write.req_buf, buf, r);
+-+
+-+	return r;
+- }
+- 
+- static int
+-diff --git a/lib/fork.c b/lib/fork.c
+-index 28250fb..31d3909 100644
+---- a/lib/fork.c
+-+++ b/lib/fork.c
+-@@ -48,16 +48,19 @@ pgfault(struct UTrapframe *utf)
+- 
+- 	// LAB 4: Your code here.
+- 
+-+	// Alineo addr a PGSIZE
+-+	void *addr_aligned = ROUNDDOWN(addr, PGSIZE);
+-+
+- 	int r;
+- 	// Reservo una nueva pagina temporal
+- 	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
+- 			panic("sys_page_alloc: %e", r);
+- 	}
+- 	// Copio el contenido original a la nueva pagina temporal (addr --> PFTEMP)
+--	memmove(PFTEMP, addr, PGSIZE);
+-+	memmove(PFTEMP, addr_aligned, PGSIZE);
+- 	
+- 	// Mapeo la nueva pagina temporal a la original
+--	if ((r = sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
+-+	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
+- 		panic("sys_page_map: %e", r);
+- 	}
+- 	// Elimino la nueva pagina temporal
+-@@ -90,7 +93,7 @@ duppage(envid_t envid, unsigned pn)
+- 	pte_t actual_pte = uvpt[pn];
+- 
+- 	// Me quedo con los bits de permisos
+--	int father_perm = actual_pte | PTE_SYSCALL;
+-+	int father_perm = actual_pte & PTE_SYSCALL;
+- 	
+- 	// Inicialmente los permisos del hijo son heredados del padre
+- 	int child_perm = father_perm;
+-@@ -109,7 +112,7 @@ duppage(envid_t envid, unsigned pn)
+- 	}
+- 	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
+- 	if (child_perm & PTE_COW) {
+--		if ((r = sys_page_map(envid, (void *) va, envid, (void *) va, child_perm)) < 0) {
+-+		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) < 0) {
+- 			panic("sys_page_map: %e", r);
+- 		}
+- 	}
+-@@ -227,24 +230,21 @@ fork(void)
+- 	if (envid == 0) {
+- 		// Actualizo la variable thisenv ya que referencia al padre
+- 		thisenv = &envs[ENVX(sys_getenvid())];
+--
+--		// TODO: aca esta el error creo
+--		// Instalo en el hijo el handler de excepciones
+--		// Tambien reservo memoria para su UXSTACK
+--		if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_SYSCALL)) < 0) {
+--			panic("sys_page_alloc: %e", r);
+--		}
+--		sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+--		
+-+	
+- 		return 0;
+- 	}
+-+	// Reservo memoria para el UXSTACK del hijo
+-+	if ((r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
+-+		panic("sys_page_alloc: %e", r);
+-+	}
+-+	// Instalo el handler de excepciones en el hijo
+-+	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+- 
+- 	// Es el proceso padre
+- 	bool is_maped;
+- 	bool va_in_xstack;
+- 	int va;
+- 	
+--	// TODO: optimizar este for para no recorrer paginas innecesarias
+- 	for (va=0; va<UTOP; va+=PGSIZE) {
+- 		// La region correspondiente a la pila de excepciones (UXSTACK) no se mapea
+- 		va_in_xstack = (va >= UXSTACKTOP - PGSIZE) && (va < UXSTACKTOP);
+
 diff --git a/kern/env.c b/kern/env.c
-index 6853bc8..98ad172 100644
+index 98ad172..d7c096d 100644
 --- a/kern/env.c
 +++ b/kern/env.c
-@@ -437,7 +437,9 @@ env_create(uint8_t *binary, enum EnvType type)
- 	// If this is the file server (type == ENV_TYPE_FS) give it I/O
- 	// privileges.
- 	// LAB 5: Your code here.
+@@ -120,10 +120,10 @@ env_init(void)
+ 	for (i = NENV; i > 0; i--) {
+ 		// Armo la lista enlazada de envs libres de modo tal que
+ 		// en la primera llamada a env_init --> env_free_list = envs[0]
+-		envs[i-1].env_status = ENV_FREE;
+-		envs[i-1].env_id = 0;
+-		envs[i-1].env_link = env_free_list;
+-		env_free_list = &envs[i-1];
++		envs[i - 1].env_status = ENV_FREE;
++		envs[i - 1].env_id = 0;
++		envs[i - 1].env_link = env_free_list;
++		env_free_list = &envs[i - 1];
+ 	}
+ 	// Per-CPU part of the initialization
+ 	env_init_percpu();
+@@ -298,19 +298,21 @@ region_alloc(struct Env *e, void *va, size_t len)
+ 	// Alineo va a PGSIZE (down)
+ 	size_t va_aligned = ROUNDDOWN((size_t) va, PGSIZE);
+ 	// Alineo va+len a PGSIZE (up)
+-	size_t space_aligned = ROUNDUP((size_t) va+len, PGSIZE);
++	size_t space_aligned = ROUNDUP((size_t) va + len, PGSIZE);
+ 
+ 	// Realizo un ciclo para los len bytes
+ 	size_t i;
+-	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
++	for (i = va_aligned; i < space_aligned; i += PGSIZE) {
+ 		// Aloco una pagina fisica
+ 		struct PageInfo *new_page = page_alloc(0);
+ 		if (!new_page) {
+ 			panic("Error al alocar la pagina fisica");
+ 		}
+ 		// Mapeo la pagina fisica con la va actual en el pgdir del proceso
+-		if (page_insert(e->env_pgdir, new_page, (void *) i, PTE_U | PTE_W) < 0) {
+-			panic("Error al mapear la pagina fisica en la direccion virtual");
++		if (page_insert(e->env_pgdir, new_page, (void *) i, PTE_U | PTE_W) <
++		    0) {
++			panic("Error al mapear la pagina fisica en la "
++			      "direccion virtual");
+ 		}
+ 	}
+ }
+@@ -390,9 +392,13 @@ load_icode(struct Env *e, uint8_t *binary)
+ 			// Aloco el size del segmento en memoria fisica y lo mapeo a su va
+ 			region_alloc(e, (void *) ph->p_va, (size_t) ph->p_memsz);
+ 			// Copio los bytes del segmento a su va
+-			memcpy((void *) ph->p_va, binary + ph->p_offset, (size_t) ph->p_filesz);
++			memcpy((void *) ph->p_va,
++			       binary + ph->p_offset,
++			       (size_t) ph->p_filesz);
+ 			// Seteo los bytes restantes del segmento en 0
+-			memset((void *) (ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
++			memset((void *) (ph->p_va + ph->p_filesz),
++			       0,
++			       ph->p_memsz - ph->p_filesz);
+ 		}
+ 		ph++;
+ 	}
+@@ -423,7 +429,7 @@ env_create(uint8_t *binary, enum EnvType type)
+ 	// LAB 3: Your code here.
+ 	struct Env *new_env;
+ 	envid_t parent_id = 0;
+-	
++
+ 	// Aloco un nuevo proceso
+ 	int err = env_alloc(&new_env, parent_id);
+ 	if (err < 0) {
+@@ -579,7 +585,7 @@ env_run(struct Env *e)
+ 	// Seteo el nuevo proceso en ejecucion
+ 	curenv = e;
+ 	e->env_status = ENV_RUNNING;
+-	e->env_runs ++;
++	e->env_runs++;
+ 
+ 	// Cambio el espacio virtual de direcciones (kernel --> proceso)
+ 	lcr3(PADDR(e->env_pgdir));
+diff --git a/kern/pmap.c b/kern/pmap.c
+index 142e4ae..ed0ad59 100644
+--- a/kern/pmap.c
++++ b/kern/pmap.c
+@@ -109,7 +109,7 @@ boot_alloc(uint32_t n)
+ 	//
+ 	// LAB 2: Your code here.
+ 	// El limite es la cantidad de paginas x su tamaño (memoria fisica)
+-	uint32_t top_limit = npages*PGSIZE;
++	uint32_t top_limit = npages * PGSIZE;
+ 	// Me guardo el offset actual
+ 	uint32_t offset = (uint32_t) nextfree;
+ 	// Obtengo la direccion virtual a la que llegaria con n + offset
+@@ -121,7 +121,7 @@ boot_alloc(uint32_t n)
+ 		panic("No hay suficiente memoria física\n");
+ 	}
+ 	// Si n==0 devuelvo la proxima pagina libre
+-	if (n==0) {
++	if (n == 0) {
+ 		return nextfree;
+ 	} else {
+ 		// Me guardo la posicion actual de nextfree para luego devolverlo
+@@ -176,14 +176,14 @@ mem_init(void)
+ 	// memset
+ 	// to initialize all fields of each struct PageInfo to 0.
+ 	// Your code goes here:
+-	pages = boot_alloc(npages*sizeof(struct PageInfo));
+-	memset(pages, 0, npages*sizeof(struct PageInfo));
++	pages = boot_alloc(npages * sizeof(struct PageInfo));
++	memset(pages, 0, npages * sizeof(struct PageInfo));
+ 
+ 	//////////////////////////////////////////////////////////////////////
+ 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
+ 	// LAB 3: Your code here.
+-	envs = boot_alloc(NENV*sizeof(struct Env));
+-	memset(envs, 0, NENV*sizeof(struct Env));
++	envs = boot_alloc(NENV * sizeof(struct Env));
++	memset(envs, 0, NENV * sizeof(struct Env));
+ 
+ 	//////////////////////////////////////////////////////////////////////
+ 	// Now that we've allocated the initial kernel data structures, we set
+@@ -207,7 +207,7 @@ mem_init(void)
+ 	//      (ie. perm = PTE_U | PTE_P)
+ 	//    - pages itself -- kernel RW, user NONE
+ 	// Your code goes here:
+-	size_t size = ROUNDUP(npages*sizeof(struct PageInfo), PGSIZE);
++	size_t size = ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE);
+ 	boot_map_region(kern_pgdir, UPAGES, size, PADDR(pages), PTE_U);
+ 
+ 	//////////////////////////////////////////////////////////////////////
+@@ -217,7 +217,7 @@ mem_init(void)
+ 	//    - the new image at UENVS  -- kernel R, user R
+ 	//    - envs itself -- kernel RW, user NONE
+ 	// LAB 3: Your code here.
+-	size_t size_envs = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
++	size_t size_envs = ROUNDUP(NENV * sizeof(struct Env), PGSIZE);
+ 	boot_map_region(kern_pgdir, UENVS, size_envs, PADDR(envs), PTE_U);
+ 
+ 	//////////////////////////////////////////////////////////////////////
+@@ -231,7 +231,11 @@ mem_init(void)
+ 	//       overwrite memory.  Known as a "guard page".
+ 	//     Permissions: kernel RW, user NONE
+ 	// Your code goes here:
+-	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
++	boot_map_region(kern_pgdir,
++	                KSTACKTOP - KSTKSIZE,
++	                KSTKSIZE,
++	                PADDR(bootstack),
++	                PTE_W);
+ 
+ 	//////////////////////////////////////////////////////////////////////
+ 	// Map all of physical memory at KERNBASE.
+@@ -295,13 +299,16 @@ mem_init_mp(void)
+ 	//
+ 	// LAB 4: Your code here:
+ 	int i;
+-	for (i=0; i<NCPU; i++) {
++	for (i = 0; i < NCPU; i++) {
+ 		// Mapeo el CPU i kernel stack (el invalid memory no se mapea)
+ 		// Empiezo en KSTACKTOP y le voy restando i*(KSTKSIZE+KSTKGAP)
+ 		// para pasar al siguiente kernel stack
+ 		// Le resto KSTKSIZE ya que boot_map_region mapea hacia arriba
+-		boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE - i*(KSTKSIZE + KSTKGAP),
+-						KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
++		boot_map_region(kern_pgdir,
++		                KSTACKTOP - KSTKSIZE - i * (KSTKSIZE + KSTKGAP),
++		                KSTKSIZE,
++		                PADDR(percpu_kstacks[i]),
++		                PTE_W);
+ 	}
+ }
+ 
+@@ -341,28 +348,31 @@ page_init(void)
+ 	// Change the code to reflect this.
+ 	// NB: DO NOT actually touch the physical memory corresponding to
+ 	// free pages!
+-	
+-	_Static_assert(MPENTRY_PADDR % PGSIZE == 0, "MPENTRY_PADDR is not page-aligned");
+-	
++
++	_Static_assert(MPENTRY_PADDR % PGSIZE == 0,
++	               "MPENTRY_PADDR is not page-aligned");
++
+ 	size_t i;
+ 	for (i = 0; i < npages; i++) {
+ 		// nextfree page physicall address
+ 		physaddr_t first_free_page = PADDR((char *) boot_alloc(0));
+ 		// actual page physicall address
+ 		physaddr_t page_pa = page2pa(&pages[i]);
+-		
++
+ 		// Las siguientes condiciones me indican memoria invalida:
+ 		// - Pagina 0
+-		bool first_page = i==0;
++		bool first_page = i == 0;
+ 		// - Espacio para I/O (desde IOPHYSMEM hasta EXTPHYSMEM)
+ 		bool io_space = page_pa >= IOPHYSMEM && page_pa <= EXTPHYSMEM;
+ 		// - Espacio para el kernel y boot_alloc (desde EXTPHYSMEM hasta nextfree)
+-		bool kernel_boot_alloc_space = page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
++		bool kernel_boot_alloc_space =
++		        page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
+ 		// - Pagina 7 se reserva para el arranque
+-		bool mpentry_page = i==7;
++		bool mpentry_page = i == 7;
+ 
+ 		// No las agrego a la lista de paginas libres
+-		bool invalid_page = first_page || io_space || kernel_boot_alloc_space || mpentry_page;
++		bool invalid_page = first_page || io_space ||
++		                    kernel_boot_alloc_space || mpentry_page;
+ 		if (invalid_page) {
+ 			continue;
+ 		}
+@@ -403,7 +413,7 @@ page_alloc(int alloc_flags)
+ 	// Ponemos en 0 los 4KB (PGSIZE) de la pagina alocada
+ 	// Con esto limpiamos basura que haya quedado
+ 	// En particular algun bit PTE_P en 1
+-	if (alloc_flags==ALLOC_ZERO) {
++	if (alloc_flags == ALLOC_ZERO) {
+ 		memset(page2kva(free_page), '\0', PGSIZE);
+ 	}
+ 	return free_page;
+@@ -475,16 +485,16 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
+ {
+ 	// Page table entry (aca se carga la virtual address de la page table)
+ 	pte_t *pgtab_addr;
+-	
++
+ 	// Me guardo el offset en la page directory (primeros 10 bits de va)
+ 	int pgdir_offset = PDX(va);
+ 	// Me guardo el offset en la page table (segundos 10 bits de va)
+ 	int pgtab_offset = PTX(va);
+-	
++
+ 	// Si no esta el bit de presencia (PTE_P) --> no hay page table asociada a la page directory
+ 	if (!(pgdir[pgdir_offset] & PTE_P)) {
+ 		// Si create == 0 --> devuelvo null y no hago nada
+-		if (create==0) {
++		if (create == 0) {
+ 			return NULL;
+ 		}
+ 		// Creo una nueva page table
+@@ -494,17 +504,20 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
+ 		if (!new_page_table) {
+ 			return NULL;
+ 		}
+-		new_page_table->pp_ref ++;
+-		// Cargo en el registro de la page directory la direccion fisica de la nueva page table
+-		// Y le asigno el bit de presencia (PTE_P) y los permisos (PTE_U y PTE_W)
+-		pgdir[pgdir_offset] = page2pa(new_page_table) | PTE_P | PTE_U | PTE_W;
++		new_page_table->pp_ref++;
++		// Cargo en el registro de la page directory la direccion fisica
++		// de la nueva page table Y le asigno el bit de presencia
++		// (PTE_P) y los permisos (PTE_U y PTE_W)
++		pgdir[pgdir_offset] =
++		        page2pa(new_page_table) | PTE_P | PTE_U | PTE_W;
+ 		// Convierto la nueva page table a virtual address
+ 		pgtab_addr = page2kva(new_page_table);
+ 	} else {
+-		// Me guardo la direccion fisica de la page table asociada (primeros 20 bits del registro del page directory)
+-		// pgdir[pgdir_offset] es la posicion dentro del page directory --> = pgdir + pgdir_offset
++		// Me guardo la direccion fisica de la page table asociada (primeros
++		// 20 bits del registro del page directory) pgdir[pgdir_offset]
++		// es la posicion dentro del page directory --> = pgdir + pgdir_offset
+ 		physaddr_t pgtable_phys_addr = PTE_ADDR(pgdir[pgdir_offset]);
+-		
++
+ 		// Convierto la direccion fisica de la page table a virtual address
+ 		pgtab_addr = KADDR(pgtable_phys_addr);
+ 	}
+@@ -527,7 +540,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
+ static void
+ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
+ {
+-	#ifdef TP1_PSE
++#ifdef TP1_PSE
+ 	// Implementacion para large pages
+ 	uintptr_t actual_va;
+ 	physaddr_t actual_pa;
+@@ -535,7 +548,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
+ 	int aux_size;
+ 	uintptr_t i;
+ 
+-	for (i=0; i<size; i+=aux_size) {
++	for (i = 0; i < size; i += aux_size) {
+ 		// Actualizo las direcciones virtuales y fisicas
+ 		actual_va = va + i;
+ 		actual_pa = pa + i;
+@@ -547,20 +560,21 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
+ 			pgdir[PDX(actual_va)] = actual_pa | perm | PTE_P | PTE_PS;
+ 			aux_size = PTSIZE;
+ 		} else {
+-		// Si no, aplico la logica original (avanzo de a PGSIZE)
+-			pte_t *pgtab_addr = pgdir_walk(pgdir, (void *) actual_va, 1);
++			// Si no, aplico la logica original (avanzo de a PGSIZE)
++			pte_t *pgtab_addr =
++			        pgdir_walk(pgdir, (void *) actual_va, 1);
+ 			*pgtab_addr = actual_pa | perm | PTE_P;
+ 			aux_size = PGSIZE;
+ 		}
+ 	}
+ 
+-	#else
++#else
+ 	// Implementacion original
+ 	uintptr_t actual_va;
+ 	physaddr_t actual_pa;
+ 	uintptr_t i;
+ 	// Recorro las direcciones de a PGSIZE bytes
+-	for (i=0; i<size; i+=PGSIZE) {
++	for (i = 0; i < size; i += PGSIZE) {
+ 		// Actualizo las direcciones virtuales y fisicas
+ 		actual_va = va + i;
+ 		actual_pa = pa + i;
+@@ -569,11 +583,10 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
+ 		// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
+ 		*pgtab_addr = actual_pa | perm | PTE_P;
+ 	}
+-	#endif
++#endif
+ }
+ 
+ 
 -
-+	if (type == ENV_TYPE_FS) {
-+		new_env->env_tf.tf_eflags = FL_IOPL_MASK;
-+	}
- }
- 
  //
-diff --git a/lib/file.c b/lib/file.c
-index f2e0b45..745fe99 100644
---- a/lib/file.c
-+++ b/lib/file.c
-@@ -141,7 +141,17 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
- 	// remember that write is always allowed to write *fewer*
- 	// bytes than requested.
- 	// LAB 5: Your code here
--	panic("devfile_write not implemented");
-+	//panic("devfile_write not implemented");
-+
-+	int r;
-+	fsipcbuf.write.req_fileid = fd->fd_file.id;
-+	fsipcbuf.write.req_n = n;
-+	if ((r = fsipc(FSREQ_WRITE, NULL)) < 0)
-+		return r;
-+	assert(r <= PGSIZE);
-+	memmove(fsipcbuf.write.req_buf, buf, r);
-+
-+	return r;
+ // Map the physical page 'pp' at virtual address 'va'.
+ // The permissions (the low 12 bits) of the page table entry
+@@ -641,7 +654,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
+ 
+ 	// Obtengo la direccion de la page table entry
+ 	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 0);
+-	if (!pgtab_addr){
++	if (!pgtab_addr) {
+ 		return NULL;
+ 	}
+ 	// Obtengo la direccion fisica a donde apunta el page table entry
+@@ -650,10 +663,10 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
+ 	physaddr_t page_phys_addr = pgtable_phys_addr + phys_offset;
+ 
+ 	// Guardo la direccion fisica del page table entry en pte_store
+-	if (pte_store != 0){
++	if (pte_store != 0) {
+ 		*pte_store = pgtab_addr;
+ 	}
+-	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida 
++	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida
+ 	return pa2page(page_phys_addr);
  }
  
+@@ -679,7 +692,7 @@ page_remove(pde_t *pgdir, void *va)
+ 	// Me guardo en pgtab_addr el page table entry
+ 	pte_t *pgtab_addr;
+ 	struct PageInfo *mapped_page = page_lookup(pgdir, va, &pgtab_addr);
+-	if (!mapped_page){
++	if (!mapped_page) {
+ 		return;
+ 	}
+ 	// Decremento el pp_ref y libero la pagina si pp_ref llega a cero
+@@ -736,14 +749,14 @@ mmio_map_region(physaddr_t pa, size_t size)
+ 	// Hint: The staff solution uses boot_map_region.
+ 	//
+ 	// Your code here:
+-	//panic("mmio_map_region not implemented");
++	// panic("mmio_map_region not implemented");
+ 
+ 	// Me guardo la base previa
+ 	uintptr_t prev_base = base;
+-	
++
+ 	int perm = PTE_W | PTE_PCD | PTE_PWT;
+ 	size_t size_aligned = ROUNDUP(size, PGSIZE);
+-	
++
+ 	// Chequeo que no se pase de MMIOLIM
+ 	if (base + size_aligned > MMIOLIM) {
+ 		panic("Overflow MMIOLIM");
+@@ -784,25 +797,26 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
+ 	// Alineo va a PGSIZE (down)
+ 	size_t va_aligned = ROUNDDOWN((size_t) va, PGSIZE);
+ 	// Alineo va+len a PGSIZE (up)
+-	size_t space_aligned = ROUNDUP((size_t) va+len, PGSIZE);
++	size_t space_aligned = ROUNDUP((size_t) va + len, PGSIZE);
+ 
+ 	// Realizo un ciclo para los len bytes
+ 	size_t i;
+-	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
++	for (i = va_aligned; i < space_aligned; i += PGSIZE) {
+ 		// Obtengo la pagina actual del pgdir del proceso
+-		pte_t *actual_page = pgdir_walk(env->env_pgdir, (const void *) i, 0);
++		pte_t *actual_page =
++		        pgdir_walk(env->env_pgdir, (const void *) i, 0);
+ 
+-		// Las siguientes condiciones me indican acceso a memoria valida:
+-		// (0) existe actual page
++		// Las siguientes condiciones me indican acceso a memoria
++		// valida: (0) existe actual page
+ 		bool page_ok = actual_page;
+ 		// (1) va < ULIM
+ 		bool ulim_va = i < ULIM;
+ 		// (2) permisos aceptados por la page table
+ 		bool perm_ok = ((*actual_page & perm) == perm);
+-		
++
+ 		// Si la va no es accesible, me guardo la primera va erronea y devuelvo
+ 		bool allowed_va = page_ok && ulim_va && perm_ok;
+-		
++
+ 		if (!allowed_va) {
+ 			// Si i < va --> me guardo va
+ 			bool i_lower_than_va = i < (size_t) va;
+diff --git a/kern/sched.c b/kern/sched.c
+index a6b498e..19effc9 100644
+--- a/kern/sched.c
++++ b/kern/sched.c
+@@ -42,10 +42,10 @@ sched_yield(void)
+ 	} else {
+ 		index_nextenv = 0;
+ 	}
+-	
++
+ 	int index_actual;
+ 	int i;
+-	for (i=0; i<NENV; i++) {
++	for (i = 0; i < NENV; i++) {
+ 		index_actual = (index_nextenv + i) % NENV;
+ 
+ 		if (envs[index_actual].env_status == ENV_RUNNABLE) {
+diff --git a/kern/syscall.c b/kern/syscall.c
+index 2d7071a..ff340c4 100644
+--- a/kern/syscall.c
++++ b/kern/syscall.c
+@@ -100,7 +100,7 @@ sys_exofork(void)
+ 	new_env->env_tf = curenv->env_tf;
+ 	// Seteo el valor de retorno en 0 para el hijo
+ 	new_env->env_tf.tf_regs.reg_eax = 0;
+-	
++
+ 	return new_env->env_id;
+ }
+ 
+@@ -122,7 +122,7 @@ sys_env_set_status(envid_t envid, int status)
+ 
+ 	// LAB 4: Your code here.
+ 	// panic("sys_env_set_status not implemented");
+-	
++
+ 	struct Env *e;
+ 	// Chequeo que el status sea valido
+ 	if ((status != ENV_RUNNABLE) && (status != ENV_NOT_RUNNABLE)) {
+@@ -150,7 +150,7 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
+ 	// LAB 5: Your code here.
+ 	// Remember to check whether the user has supplied us with a good
+ 	// address!
+-	//panic("sys_env_set_trapframe not implemented");
++	// panic("sys_env_set_trapframe not implemented");
+ 
+ 	struct Env *e;
+ 	if (envid2env(envid, &e, 1) < 0) {
+@@ -160,7 +160,10 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
+ 	// Chequeo que tf apunte a memoria de usuario valida
+ 	uintptr_t stack_top = tf->tf_esp;
+ 	uintptr_t stack_bottom = stack_top - sizeof(struct Trapframe);
+-	user_mem_assert(e, (const void *) stack_bottom, sizeof(struct Trapframe), PTE_U | PTE_P | PTE_W);
++	user_mem_assert(e,
++	                (const void *) stack_bottom,
++	                sizeof(struct Trapframe),
++	                PTE_U | PTE_P | PTE_W);
+ 
+ 	// Seteo el trapframe del proceso en tf
+ 	e->env_tf = *tf;
+@@ -170,7 +173,7 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
+ 	e->env_tf.tf_es |= 3;
+ 	e->env_tf.tf_ss |= 3;
+ 	e->env_tf.tf_cs |= 3;
+-	
++
+ 	// Le habilito interrupciones y pongo el IOPL a 0
+ 	e->env_tf.tf_eflags |= (FL_IF | FL_IOPL_0);
+ 
+@@ -276,7 +279,12 @@ sys_page_alloc(envid_t envid, void *va, int perm)
+ //		address space.
+ //	-E_NO_MEM if there's no memory to allocate any necessary page tables.
  static int
-diff --git a/lib/fork.c b/lib/fork.c
-index 28250fb..31d3909 100644
---- a/lib/fork.c
-+++ b/lib/fork.c
-@@ -48,16 +48,19 @@ pgfault(struct UTrapframe *utf)
+-sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int perm, int checkperm)
++sys_page_map(envid_t srcenvid,
++             void *srcva,
++             envid_t dstenvid,
++             void *dstva,
++             int perm,
++             int checkperm)
+ {
+ 	// Hint: This function is a wrapper around page_lookup() and
+ 	//   page_insert() from kern/pmap.c.
+@@ -292,12 +300,14 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
+ 	struct Env *src_env;
+ 	struct Env *dst_env;
+ 	if ((envid2env(srcenvid, &src_env, checkperm) < 0) ||
+-		(envid2env(dstenvid, &dst_env, checkperm) < 0)) {
++	    (envid2env(dstenvid, &dst_env, checkperm) < 0)) {
+ 		return -E_BAD_ENV;
+ 	}
+ 	// Chequeo la va y los permisos
+-	bool srcva_ok = ((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE == 0);
+-	bool dstva_ok = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);
++	bool srcva_ok =
++	        ((uintptr_t) srcva < UTOP) && ((uintptr_t) srcva % PGSIZE == 0);
++	bool dstva_ok =
++	        ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE == 0);
+ 	bool perm_ok = (perm & (PTE_U | PTE_P)) && (PTE_SYSCALL & perm);
+ 
+ 	if ((!srcva_ok) || (!dstva_ok) || (!perm_ok)) {
+@@ -305,7 +315,8 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
+ 	}
+ 	// Obtengo la pagina mapeada en srcva
+ 	pte_t *pgtab_entry;
+-	struct PageInfo *src_page = page_lookup(src_env->env_pgdir, srcva, &pgtab_entry);
++	struct PageInfo *src_page =
++	        page_lookup(src_env->env_pgdir, srcva, &pgtab_entry);
+ 	// Si page_lookup devuelve NULL quiere decir que srcva no esta mapeada
+ 	// en el address space de srcenvid
+ 	if (!src_page) {
+@@ -336,7 +347,7 @@ sys_page_unmap(envid_t envid, void *va)
+ 	// Hint: This function is a wrapper around page_remove().
+ 
+ 	// LAB 4: Your code here.
+-	//panic("sys_page_unmap not implemented");
++	// panic("sys_page_unmap not implemented");
+ 
+ 	// Obtengo el env asociado al envid
+ 	struct Env *e;
+@@ -410,7 +421,9 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
+ 	// Comparto la pagina entre el caller y el receiver si srcva < UTOP y dstva < UTOP
+ 	bool map_page = 0;
+ 	if (((uintptr_t) srcva < UTOP) && ((uintptr_t) e->env_ipc_dstva < UTOP)) {
+-		if ((r = sys_page_map(curenv->env_id, srcva, envid, e->env_ipc_dstva, perm, 0)) < 0) {
++		if ((r = sys_page_map(
++		             curenv->env_id, srcva, envid, e->env_ipc_dstva, perm, 0)) <
++		    0) {
+ 			return r;
+ 		} else {
+ 			map_page = 1;
+@@ -442,8 +455,9 @@ sys_ipc_recv(void *dstva)
+ {
+ 	// LAB 4: Your code here.
+ 	// panic("sys_ipc_recv not implemented");
+-	
+-	bool dstva_not_aligned = ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE != 0);
++
++	bool dstva_not_aligned =
++	        ((uintptr_t) dstva < UTOP) && ((uintptr_t) dstva % PGSIZE != 0);
+ 	if (dstva_not_aligned) {
+ 		return -E_INVAL;
+ 	}
+@@ -469,35 +483,42 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
+ 
+ 	// Los cases son segun la convencion definida en inc\syscall.h
+ 	switch (syscallno) {
+-		case SYS_cputs:
+-			sys_cputs((const char *) a1, (size_t) a2);
+-		case SYS_cgetc:
+-			return sys_cgetc();
+-		case SYS_getenvid:
+-			return sys_getenvid();
+-		case SYS_env_destroy:
+-			return sys_env_destroy((envid_t) a1);
+-		case SYS_yield:
+-			sched_yield();
+-		case SYS_exofork:
+-			return sys_exofork();
+-		case SYS_page_alloc:
+-			return sys_page_alloc((envid_t) a1, (void *) a2, (int) a3);
+-		case SYS_page_map:
+-			return sys_page_map((envid_t) a1, (void *) a2, (envid_t) a3, (void *) a4, (int) a5, 1);
+-		case SYS_page_unmap:
+-			return sys_page_unmap((envid_t) a1, (void *) a2);
+-		case SYS_env_set_status:
+-			return sys_env_set_status((envid_t) a1, (int) a2);
+-		case SYS_ipc_try_send:
+-			return sys_ipc_try_send((envid_t) a1, (uint32_t) a2, (void *) a3, (unsigned) a4);
+-		case SYS_ipc_recv:
+-			return sys_ipc_recv((void *) a1);
+-		case SYS_env_set_pgfault_upcall:
+-			return sys_env_set_pgfault_upcall((envid_t) a1, (void *) a2);
+-		case SYS_env_set_trapframe:
+-			return sys_env_set_trapframe((envid_t) a1, (struct Trapframe *) a2);
+-		default:
+-			return -E_INVAL;
++	case SYS_cputs:
++		sys_cputs((const char *) a1, (size_t) a2);
++	case SYS_cgetc:
++		return sys_cgetc();
++	case SYS_getenvid:
++		return sys_getenvid();
++	case SYS_env_destroy:
++		return sys_env_destroy((envid_t) a1);
++	case SYS_yield:
++		sched_yield();
++	case SYS_exofork:
++		return sys_exofork();
++	case SYS_page_alloc:
++		return sys_page_alloc((envid_t) a1, (void *) a2, (int) a3);
++	case SYS_page_map:
++		return sys_page_map((envid_t) a1,
++		                    (void *) a2,
++		                    (envid_t) a3,
++		                    (void *) a4,
++		                    (int) a5,
++		                    1);
++	case SYS_page_unmap:
++		return sys_page_unmap((envid_t) a1, (void *) a2);
++	case SYS_env_set_status:
++		return sys_env_set_status((envid_t) a1, (int) a2);
++	case SYS_ipc_try_send:
++		return sys_ipc_try_send(
++		        (envid_t) a1, (uint32_t) a2, (void *) a3, (unsigned) a4);
++	case SYS_ipc_recv:
++		return sys_ipc_recv((void *) a1);
++	case SYS_env_set_pgfault_upcall:
++		return sys_env_set_pgfault_upcall((envid_t) a1, (void *) a2);
++	case SYS_env_set_trapframe:
++		return sys_env_set_trapframe((envid_t) a1,
++		                             (struct Trapframe *) a2);
++	default:
++		return -E_INVAL;
+ 	}
+ }
+diff --git a/kern/trap.c b/kern/trap.c
+index 1904ac6..7b746bc 100644
+--- a/kern/trap.c
++++ b/kern/trap.c
+@@ -175,17 +175,20 @@ trap_init_percpu(void)
+ 	uint16_t seg = idx << 3;
+ 
+ 	// Seteo el TSS para obtener el stack correcto cuando trapeamos al kernel
+-	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - id*(KSTKSIZE + KSTKGAP);
++	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - id * (KSTKSIZE + KSTKGAP);
+ 	thiscpu->cpu_ts.ts_ss0 = GD_KD;
+ 	thiscpu->cpu_ts.ts_iomb = sizeof(struct Taskstate);
+ 
+ 	// Inicializo el TSS slot para la GDT
+-	gdt[idx] = SEG16(STS_T32A, (uint32_t)(&thiscpu->cpu_ts), sizeof(struct Taskstate) - 1, 0);
++	gdt[idx] = SEG16(STS_T32A,
++	                 (uint32_t)(&thiscpu->cpu_ts),
++	                 sizeof(struct Taskstate) - 1,
++	                 0);
+ 	gdt[idx].sd_s = 0;
+ 
+ 	// Cargo la TSS selector para cada core adicional
+ 	// (like other segment selectors, the bottom three bits are special; we leave them 0)
+-	ltr(GD_TSS0 + 8*id);
++	ltr(GD_TSS0 + 8 * id);
+ 
+ 	// Cargo la IDT
+ 	lidt(&idt_pd);
+@@ -199,8 +202,8 @@ trap_init_percpu(void)
+ 
+ 	// Initialize the TSS slot of the gdt.
+ 	gdt[GD_TSS0 >> 3] =
+-	        SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1, 0);
+-	gdt[GD_TSS0 >> 3].sd_s = 0;
++	        SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1,
++	0); gdt[GD_TSS0 >> 3].sd_s = 0;
+ 
+ 	// Load the TSS selector (like other segment selectors, the
+ 	// bottom three bits are special; we leave them 0)
+@@ -272,15 +275,15 @@ trap_dispatch(struct Trapframe *tf)
+ 		return;
+ 	}
+ 
+-	if(tf->tf_trapno == T_SYSCALL) {
++	if (tf->tf_trapno == T_SYSCALL) {
+ 		// Le paso los parametros segun la convencion definida en lib\syscall.c
+ 		// Me guardo el valor de retorno de la syscall en %eax
+ 		tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax,
+-									  tf->tf_regs.reg_edx,
+-									  tf->tf_regs.reg_ecx,
+-									  tf->tf_regs.reg_ebx,
+-									  tf->tf_regs.reg_edi,
+-									  tf->tf_regs.reg_esi);
++		                              tf->tf_regs.reg_edx,
++		                              tf->tf_regs.reg_ecx,
++		                              tf->tf_regs.reg_ebx,
++		                              tf->tf_regs.reg_edi,
++		                              tf->tf_regs.reg_esi);
+ 		return;
+ 	}
+ 
+@@ -349,7 +352,7 @@ trap(struct Trapframe *tf)
+ 		// serious kernel work.
+ 		// LAB 4: Your code here.
+ 		lock_kernel();
+-		
++
+ 		assert(curenv);
+ 
+ 		// Garbage collect if current enviroment is a zombie
+@@ -433,22 +436,26 @@ page_fault_handler(struct Trapframe *tf)
  
  	// LAB 4: Your code here.
  
-+	// Alineo addr a PGSIZE
-+	void *addr_aligned = ROUNDDOWN(addr, PGSIZE);
+-	if (curenv->env_pgfault_upcall){
++	if (curenv->env_pgfault_upcall) {
+ 		struct UTrapframe *utrap;
+ 
+ 		// Caso recursivo:
+ 		// Si se cumple esta condicion, quiere decir que el page fault handler genero el fault
+-		bool tf_in_xstack = (tf->tf_esp >= UXSTACKTOP - PGSIZE) && (tf->tf_esp < UXSTACKTOP);
+-		
++		bool tf_in_xstack = (tf->tf_esp >= UXSTACKTOP - PGSIZE) &&
++		                    (tf->tf_esp < UXSTACKTOP);
 +
+ 		// Si tf_in_xstack --> el top del nuevo stack va debajo del que estaba corriendo
+ 		//					   esto seria = tf->tf_esp - 4 (por el word en blanco)
+ 		// Si no 		   --> el top del nuevo stack va en UXSTACKTOP
+-		uintptr_t ustack_top = tf_in_xstack ? (tf->tf_esp - 4) : UXSTACKTOP;
++		uintptr_t ustack_top =
++		        tf_in_xstack ? (tf->tf_esp - 4) : UXSTACKTOP;
+ 		uintptr_t ustack_bottom = ustack_top - sizeof(struct UTrapframe);
+ 
+ 		// Chequeo que el curenv tiene permitido acceder al espacio de memoria
+-		user_mem_assert(curenv, (const void*) ustack_bottom,
+-						sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
++		user_mem_assert(curenv,
++		                (const void *) ustack_bottom,
++		                sizeof(struct UTrapframe),
++		                PTE_U | PTE_P | PTE_W);
+ 
+ 		// Inicializo el UTrapframe en la direccion correspondiente
+ 		utrap = (struct UTrapframe *) ustack_bottom;
+@@ -460,20 +467,20 @@ page_fault_handler(struct Trapframe *tf)
+ 		utrap->utf_eflags = tf->tf_eflags;
+ 		utrap->utf_eip = tf->tf_eip;
+ 		utrap->utf_esp = tf->tf_esp;
+-		
++
+ 		// Cambio a donde se va a ejecutar el proceso
+ 		tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+ 		tf->tf_esp = (uintptr_t) utrap;
+-		
++
+ 		// Ejecuto el curenv segun el nuevo eip y esp
+ 		env_run(curenv);
+ 	} else {
+-	// Destruyo el proceso que ocasiono el fault
++		// Destruyo el proceso que ocasiono el fault
+ 		cprintf("[%08x] user fault va %08x ip %08x\n",
+ 		        curenv->env_id,
+ 		        fault_va,
+ 		        tf->tf_eip);
+ 		print_trapframe(tf);
+-		env_destroy(curenv);		
++		env_destroy(curenv);
+ 	}
+ }
+diff --git a/lib/file.c b/lib/file.c
+index 577dcdf..8cce76f 100644
+--- a/lib/file.c
++++ b/lib/file.c
+@@ -141,15 +141,15 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
+ 	// remember that write is always allowed to write *fewer*
+ 	// bytes than requested.
+ 	// LAB 5: Your code here
+-	//panic("devfile_write not implemented");
++	// panic("devfile_write not implemented");
+ 
+ 	int r;
+ 
+ 	fsipcbuf.write.req_fileid = fd->fd_file.id;
+ 	fsipcbuf.write.req_n = n;
+-	
++
+ 	assert(n <= PGSIZE);
+-	
++
+ 	memmove(fsipcbuf.write.req_buf, buf, n);
+ 	if ((r = fsipc(FSREQ_WRITE, NULL)) < 0)
+ 		return r;
+diff --git a/lib/fork.c b/lib/fork.c
+index baafe97..f6ff96a 100644
+--- a/lib/fork.c
++++ b/lib/fork.c
+@@ -14,7 +14,7 @@
+ static void
+ pgfault(struct UTrapframe *utf)
+ {
+-	//panic("pgfault not implemented");
++	// panic("pgfault not implemented");
+ 
+ 	void *addr = (void *) utf->utf_fault_va;
+ 	uint32_t err = utf->utf_err;
+@@ -53,14 +53,15 @@ pgfault(struct UTrapframe *utf)
+ 
  	int r;
  	// Reservo una nueva pagina temporal
- 	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
- 			panic("sys_page_alloc: %e", r);
+-	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
+-			panic("sys_page_alloc: %e", r);
++	if ((r = sys_page_alloc(0, PFTEMP, PTE_P | PTE_U | PTE_W)) < 0) {
++		panic("sys_page_alloc: %e", r);
  	}
  	// Copio el contenido original a la nueva pagina temporal (addr --> PFTEMP)
--	memmove(PFTEMP, addr, PGSIZE);
-+	memmove(PFTEMP, addr_aligned, PGSIZE);
- 	
+ 	memmove(PFTEMP, addr_aligned, PGSIZE);
+-	
++
  	// Mapeo la nueva pagina temporal a la original
--	if ((r = sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_U|PTE_W)) < 0) {
-+	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
+-	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
++	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P | PTE_U | PTE_W)) <
++	    0) {
  		panic("sys_page_map: %e", r);
  	}
  	// Elimino la nueva pagina temporal
-@@ -90,7 +93,7 @@ duppage(envid_t envid, unsigned pn)
- 	pte_t actual_pte = uvpt[pn];
+@@ -84,8 +85,8 @@ static int
+ duppage(envid_t envid, unsigned pn)
+ {
+ 	// LAB 4: Your code here.
+-	//panic("duppage not implemented");
+-	
++	// panic("duppage not implemented");
++
+ 	// Obtengo la va de la pagina pn
+ 	uintptr_t va = (uintptr_t) pn * PGSIZE;
+ 
+@@ -94,10 +95,10 @@ duppage(envid_t envid, unsigned pn)
  
  	// Me quedo con los bits de permisos
--	int father_perm = actual_pte | PTE_SYSCALL;
-+	int father_perm = actual_pte & PTE_SYSCALL;
- 	
+ 	int father_perm = actual_pte & PTE_SYSCALL;
+-	
++
  	// Inicialmente los permisos del hijo son heredados del padre
  	int child_perm = father_perm;
-@@ -109,7 +112,7 @@ duppage(envid_t envid, unsigned pn)
+-	
++
+ 	// Si el padre tiene activado PTE_W, se lo desactivo al hijo
+ 	// y a su vez le activo el PTE_COW
+ 	bool is_writeable = (father_perm & PTE_W);
+@@ -106,8 +107,8 @@ duppage(envid_t envid, unsigned pn)
+ 		child_perm |= PTE_COW;
+ 	}
+ 
+-	// Si el padre tiene activado PTE_SHARE, se mantienen los permisos del padre
+-	// Lo de arriba (is_writeable) queda en desuso
++	// Si el padre tiene activado PTE_SHARE, se mantienen los permisos del
++	// padre Lo de arriba (is_writeable) queda en desuso
+ 	bool is_shareable = (father_perm & PTE_SHARE);
+ 	if (is_shareable) {
+ 		child_perm = father_perm;
+@@ -115,12 +116,14 @@ duppage(envid_t envid, unsigned pn)
+ 
+ 	// Mapeo en el hijo la pagina fisica en la misma va
+ 	int r;
+-	if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) < 0) {
++	if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) <
++	    0) {
+ 		panic("sys_page_map: %e", r);
  	}
  	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
  	if (child_perm & PTE_COW) {
--		if ((r = sys_page_map(envid, (void *) va, envid, (void *) va, child_perm)) < 0) {
-+		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) < 0) {
+-		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) < 0) {
++		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) <
++		    0) {
  			panic("sys_page_map: %e", r);
  		}
  	}
-@@ -227,24 +230,21 @@ fork(void)
+@@ -138,11 +141,12 @@ dup_or_share(envid_t dstenv, void *va, int perm)
+ 			panic("sys_page_map: %e", r);
+ 		}
+ 	} else {
+-	// Si no, la copio
+-		if ((r = sys_page_alloc(dstenv, va, PTE_P|PTE_U|PTE_W)) < 0) {
++		// Si no, la copio
++		if ((r = sys_page_alloc(dstenv, va, PTE_P | PTE_U | PTE_W)) < 0) {
+ 			panic("sys_page_alloc: %e", r);
+ 		}
+-		if ((r = sys_page_map(dstenv, va, 0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
++		if ((r = sys_page_map(dstenv, va, 0, UTEMP, PTE_P | PTE_U | PTE_W)) <
++		    0) {
+ 			panic("sys_page_map: %e", r);
+ 		}
+ 		memmove(UTEMP, va, PGSIZE);
+@@ -171,7 +175,7 @@ fork_v0(void)
+ 	// Es el proceso padre
+ 	bool is_maped;
+ 	int va;
+-	for (va=0; va<UTOP; va+=PGSIZE) {
++	for (va = 0; va < UTOP; va += PGSIZE) {
+ 		// Obtengo la direccion del page directory entry
+ 		pde_t actual_pde = uvpd[PDX(va)];
+ 		// Si tiene el bit de presencia --> hay una pagina mapeada
+@@ -184,7 +188,9 @@ fork_v0(void)
+ 			is_maped = (actual_pte & PTE_P);
+ 			// Si hay pagina mapeada, la comparto con el hijo
+ 			if (is_maped) {
+-				dup_or_share(envid, (void *) va, actual_pte | PTE_SYSCALL);
++				dup_or_share(envid,
++				             (void *) va,
++				             actual_pte | PTE_SYSCALL);
+ 			}
+ 		}
+ 	}
+@@ -193,7 +199,7 @@ fork_v0(void)
+ 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0) {
+ 		panic("sys_env_set_status: %e", r);
+ 	}
+-	return envid;	
++	return envid;
+ }
+ 
+ //
+@@ -216,13 +222,13 @@ envid_t
+ fork(void)
+ {
+ 	// LAB 4: Your code here.
+-	//panic("fork not implemented");
++	// panic("fork not implemented");
+ 
+-	//return fork_v0();
++	// return fork_v0();
+ 
+ 	int r;
+ 	extern void _pgfault_upcall(void);
+-	
++
+ 	// Instalo en el padre la funcion 'pgfault' como handler de page faults
+ 	// Tambien reservo memoria para su UXSTACK
+ 	set_pgfault_handler(pgfault);
+@@ -238,11 +244,13 @@ fork(void)
  	if (envid == 0) {
  		// Actualizo la variable thisenv ya que referencia al padre
  		thisenv = &envs[ENVX(sys_getenvid())];
--
--		// TODO: aca esta el error creo
--		// Instalo en el hijo el handler de excepciones
--		// Tambien reservo memoria para su UXSTACK
--		if ((r = sys_page_alloc(0, (void *) (UXSTACKTOP - PGSIZE), PTE_SYSCALL)) < 0) {
--			panic("sys_page_alloc: %e", r);
--		}
--		sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
--		
-+	
+-	
++
  		return 0;
  	}
-+	// Reservo memoria para el UXSTACK del hijo
-+	if ((r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
-+		panic("sys_page_alloc: %e", r);
-+	}
-+	// Instalo el handler de excepciones en el hijo
-+	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
- 
- 	// Es el proceso padre
+ 	// Reservo memoria para el UXSTACK del hijo
+-	if ((r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
++	if ((r = sys_page_alloc(envid,
++	                        (void *) (UXSTACKTOP - PGSIZE),
++	                        PTE_U | PTE_P | PTE_W)) < 0) {
+ 		panic("sys_page_alloc: %e", r);
+ 	}
+ 	// Instalo el handler de excepciones en el hijo
+@@ -252,8 +260,8 @@ fork(void)
  	bool is_maped;
  	bool va_in_xstack;
  	int va;
- 	
--	// TODO: optimizar este for para no recorrer paginas innecesarias
- 	for (va=0; va<UTOP; va+=PGSIZE) {
+-	
+-	for (va=0; va<UTOP; va+=PGSIZE) {
++
++	for (va = 0; va < UTOP; va += PGSIZE) {
  		// La region correspondiente a la pila de excepciones (UXSTACK) no se mapea
  		va_in_xstack = (va >= UXSTACKTOP - PGSIZE) && (va < UXSTACKTOP);
+ 
+diff --git a/lib/ipc.c b/lib/ipc.c
+index 69bdb91..d526b68 100644
+--- a/lib/ipc.c
++++ b/lib/ipc.c
+@@ -24,7 +24,7 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
+ {
+ 	// LAB 4: Your code here.
+ 	// panic("ipc_recv not implemented");
+-	
++
+ 	// Guardo la pagina enviada por el emisor
+ 	uintptr_t dstva;
+ 	if (pg) {
+@@ -35,8 +35,10 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
+ 	// Llamo a la syscall
+ 	int r;
+ 	if ((r = sys_ipc_recv((void *) dstva)) < 0) {
+-		if (from_env_store) *from_env_store = 0;
+-		if (perm_store) *perm_store = 0;
++		if (from_env_store)
++			*from_env_store = 0;
++		if (perm_store)
++			*perm_store = 0;
+ 		return r;
+ 	}
+ 	// Guardo el envid del emisor
+@@ -79,7 +81,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
+ 	while (!message_sent) {
+ 		// Llamo a la syscall
+ 		if ((r = sys_ipc_try_send(to_env, val, (void *) srcva, perm)) < 0) {
+-			if (r==-E_IPC_NOT_RECV) {
++			if (r == -E_IPC_NOT_RECV) {
+ 				sys_yield();
+ 			} else {
+ 				panic("ipc_send error: %e", r);
+diff --git a/lib/spawn.c b/lib/spawn.c
+index 4c9263d..09fdda8 100644
+--- a/lib/spawn.c
++++ b/lib/spawn.c
+@@ -326,7 +326,7 @@ copy_shared_pages(envid_t child)
+ 
+ 	bool is_maped, is_shareable;
+ 	int va;
+-	for (va=0; va<UTOP; va+=PGSIZE) {
++	for (va = 0; va < UTOP; va += PGSIZE) {
+ 		// Obtengo la direccion del page directory entry
+ 		pde_t actual_pde = uvpd[PDX(va)];
+ 		// Si tiene el bit de presencia --> hay una pagina mapeada
+@@ -339,9 +339,13 @@ copy_shared_pages(envid_t child)
+ 			is_maped = (actual_pte & PTE_P);
+ 			// Si tiene el bit de compartir --> la comparto con el hijo
+ 			is_shareable = (actual_pte & PTE_SHARE);
+-			
++
+ 			if (is_maped && is_shareable) {
+-				sys_page_map(0, (void *) va, child, (void *) va, actual_pte | PTE_SYSCALL);
++				sys_page_map(0,
++				             (void *) va,
++				             child,
++				             (void *) va,
++				             actual_pte | PTE_SYSCALL);
+ 			}
+ 		}
+ 	}
+diff --git a/user/sh.c b/user/sh.c
+index 66afd10..c9cd0df 100644
+--- a/user/sh.c
++++ b/user/sh.c
+@@ -55,12 +55,12 @@ again:
+ 			// then close the original 'fd'.
+ 
+ 			// LAB 5: Your code here.
+-			//panic("< redirection not implemented");
++			// panic("< redirection not implemented");
+ 			if ((fd = open(t, O_RDONLY)) < 0) {
+ 				cprintf("open %s for read: %e", t, fd);
+ 				exit();
+ 			}
+-			if (fd != 0){
++			if (fd != 0) {
+ 				dup(fd, 0);
+ 				close(fd);
+ 			}
 make clean
 make[1]: Entering directory '/home/ntorresdalmas/Desktop/sisop/tp/7508_tp'
 rm -rf obj jos.in qemu.log
@@ -538,7 +1749,7 @@ make[1]: Entering directory '/home/ntorresdalmas/Desktop/sisop/tp/7508_tp'
 + mk obj/fs/clean-fs.img
 + cp obj/fs/clean-fs.img obj/fs/fs.img
 make[1]: Leaving directory '/home/ntorresdalmas/Desktop/sisop/tp/7508_tp'
-internal FS tests [fs/test.c]: OK (2.1s) 
+internal FS tests [fs/test.c]: OK (1.4s) 
   fs i/o: OK 
   check_bc: OK 
   check_super: OK 
@@ -546,321 +1757,19 @@ internal FS tests [fs/test.c]: OK (2.1s)
   alloc_block: OK 
   file_open: OK 
   file_get_block: OK 
-  file_flush/file_truncate/file rewrite: FAIL 
-    AssertionError: ...
-         file_open is good
-         file_get_block is good
-    GOOD file_flush is good
-    GOOD file_truncate is good
-         [00001000] user panic in fs at fs/test.c:64: assertion failed: !(uvpt[PGNUM(blk)] & PTE_D)
-         Welcome to the JOS kernel monitor!
-    ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2019 (make)
-    MISSING 'file rewrite is good'
-    
-testfile: OK (1.0s) 
-  serve_open/file_stat/file_close: FAIL 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
-    MISSING 'serve_open is good'
-    MISSING 'file_stat is good'
-    MISSING 'file_close is good'
-    MISSING 'stale fileid is good'
-    
-  file_read: FAIL 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
-    MISSING 'file_read is good'
-    
-  file_write: FAIL 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
-    MISSING 'file_write is good'
-    
-  file_read after file_write: FAIL 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
-    MISSING 'file_read after file_write is good'
-    
-  open: FAIL 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
-    MISSING 'open is good'
-    
-  large file: FAIL 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2102 (make)
-    MISSING 'large file is good'
-    
-spawn via spawnhello: FAIL (1.1s) 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2205 (make)
-    MISSING 'i am parent environment 00001001'
-    MISSING 'hello, world'
-    MISSING 'i am environment 00001002'
-    MISSING 'No runnable environments in the system!'
-    
-    QEMU output saved to jos.out.spawn
-Protection I/O space: OK (0.9s) 
-PTE_SHARE [testpteshare]: FAIL (1.8s) 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2413 (make)
-    MISSING 'fork handles PTE_SHARE right'
-    MISSING 'spawn handles PTE_SHARE right'
-    
-    QEMU output saved to jos.out.pte_share
-PTE_SHARE [testfdsharing]: FAIL (2.2s) 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2516 (make)
-    MISSING 'read in child succeeded'
-    MISSING 'read in parent succeeded'
-    
-    QEMU output saved to jos.out.fd_share
-start the shell [icode]: FAIL (1.9s) 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2619 (make)
-    MISSING 'icode: read /motd'
-    MISSING 'This is /motd, the message of the day.'
-    MISSING 'icode: spawn /init'
-    MISSING 'init: running'
-    MISSING 'init: data seems okay'
-    MISSING 'icode: exiting'
-    MISSING 'init: bss seems okay'
-    MISSING 'init: args: 'init' 'initarg1' 'initarg2''
-    MISSING 'init: running sh'
-    MISSING '\$ '
-    
-    QEMU output saved to jos.out.icode
-testshell: FAIL (1.9s) 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2722 (make)
-    MISSING 'shell ran correctly'
-    
-    QEMU output saved to jos.out.testshell
-primespipe: FAIL (3.8s) 
-    AssertionError: ...
-           cs   0x----001b
-           flag 0x00003086
-           esp  0xeebfdf78
-           ss   0x----0023
-         qemu-system-i386: terminating on signal 15 from pid 2825 (make)
-    MISSING '2$'
-    MISSING '3$'
-    MISSING '5$'
-    MISSING '7$'
-    MISSING '521$'
-    MISSING '11$'
-    MISSING '523$'
-    MISSING '13$'
-    MISSING '17$'
-    MISSING '19$'
-    MISSING '23$'
-    MISSING '29$'
-    MISSING '541$'
-    MISSING '31$'
-    MISSING '547$'
-    MISSING '37$'
-    MISSING '41$'
-    MISSING '43$'
-    MISSING '557$'
-    MISSING '47$'
-    MISSING '563$'
-    MISSING '53$'
-    MISSING '569$'
-    MISSING '59$'
-    MISSING '571$'
-    MISSING '61$'
-    MISSING '577$'
-    MISSING '67$'
-    MISSING '71$'
-    MISSING '73$'
-    MISSING '587$'
-    MISSING '79$'
-    MISSING '593$'
-    MISSING '83$'
-    MISSING '599$'
-    MISSING '89$'
-    MISSING '601$'
-    MISSING '607$'
-    MISSING '97$'
-    MISSING '101$'
-    MISSING '613$'
-    MISSING '103$'
-    MISSING '617$'
-    MISSING '107$'
-    MISSING '619$'
-    MISSING '109$'
-    MISSING '113$'
-    MISSING '631$'
-    MISSING '127$'
-    MISSING '641$'
-    MISSING '131$'
-    MISSING '643$'
-    MISSING '647$'
-    MISSING '137$'
-    MISSING '139$'
-    MISSING '653$'
-    MISSING '659$'
-    MISSING '149$'
-    MISSING '661$'
-    MISSING '151$'
-    MISSING '157$'
-    MISSING '673$'
-    MISSING '163$'
-    MISSING '677$'
-    MISSING '167$'
-    MISSING '683$'
-    MISSING '173$'
-    MISSING '179$'
-    MISSING '691$'
-    MISSING '181$'
-    MISSING '701$'
-    MISSING '191$'
-    MISSING '193$'
-    MISSING '197$'
-    MISSING '709$'
-    MISSING '199$'
-    MISSING '719$'
-    MISSING '211$'
-    MISSING '727$'
-    MISSING '733$'
-    MISSING '223$'
-    MISSING '227$'
-    MISSING '739$'
-    MISSING '229$'
-    MISSING '743$'
-    MISSING '233$'
-    MISSING '239$'
-    MISSING '751$'
-    MISSING '241$'
-    MISSING '757$'
-    MISSING '761$'
-    MISSING '251$'
-    MISSING '257$'
-    MISSING '769$'
-    MISSING '773$'
-    MISSING '263$'
-    MISSING '269$'
-    MISSING '271$'
-    MISSING '787$'
-    MISSING '277$'
-    MISSING '281$'
-    MISSING '283$'
-    MISSING '797$'
-    MISSING '293$'
-    MISSING '809$'
-    MISSING '811$'
-    MISSING '307$'
-    MISSING '821$'
-    MISSING '311$'
-    MISSING '823$'
-    MISSING '313$'
-    MISSING '827$'
-    MISSING '317$'
-    MISSING '829$'
-    MISSING '839$'
-    MISSING '331$'
-    MISSING '337$'
-    MISSING '853$'
-    MISSING '857$'
-    MISSING '347$'
-    MISSING '859$'
-    MISSING '349$'
-    MISSING '863$'
-    MISSING '353$'
-    MISSING '359$'
-    MISSING '877$'
-    MISSING '367$'
-    MISSING '881$'
-    MISSING '883$'
-    MISSING '373$'
-    MISSING '887$'
-    MISSING '379$'
-    MISSING '383$'
-    MISSING '389$'
-    MISSING '907$'
-    MISSING '397$'
-    MISSING '911$'
-    MISSING '401$'
-    MISSING '919$'
-    MISSING '409$'
-    MISSING '929$'
-    MISSING '419$'
-    MISSING '421$'
-    MISSING '937$'
-    MISSING '941$'
-    MISSING '431$'
-    MISSING '433$'
-    MISSING '947$'
-    MISSING '439$'
-    MISSING '953$'
-    MISSING '443$'
-    MISSING '449$'
-    MISSING '967$'
-    MISSING '457$'
-    MISSING '971$'
-    MISSING '461$'
-    MISSING '463$'
-    MISSING '977$'
-    MISSING '467$'
-    MISSING '983$'
-    MISSING '479$'
-    MISSING '991$'
-    MISSING '997$'
-    MISSING '487$'
-    MISSING '491$'
-    MISSING '499$'
-    MISSING '503$'
-    MISSING '509$'
-    
-    QEMU output saved to jos.out.primespipe
-Score: 55/150
-GNUmakefile:203: recipe for target 'grade' failed
+  file_flush/file_truncate/file rewrite: OK 
+testfile: OK (1.4s) 
+  serve_open/file_stat/file_close: OK 
+  file_read: OK 
+  file_write: OK 
+  file_read after file_write: OK 
+  open: OK 
+  large file: OK 
+spawn via spawnhello: OK (1.1s) 
+Protection I/O space: OK (1.1s) 
+PTE_SHARE [testpteshare]: OK (2.0s) 
+PTE_SHARE [testfdsharing]: OK (1.0s) 
+start the shell [icode]: Timeout! OK (31.6s) 
+testshell: OK (3.6s) 
+primespipe: OK (16.5s) 
+Score: 150/150

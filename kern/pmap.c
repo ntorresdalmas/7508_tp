@@ -109,7 +109,7 @@ boot_alloc(uint32_t n)
 	//
 	// LAB 2: Your code here.
 	// El limite es la cantidad de paginas x su tamaño (memoria fisica)
-	uint32_t top_limit = npages*PGSIZE;
+	uint32_t top_limit = npages * PGSIZE;
 	// Me guardo el offset actual
 	uint32_t offset = (uint32_t) nextfree;
 	// Obtengo la direccion virtual a la que llegaria con n + offset
@@ -121,7 +121,7 @@ boot_alloc(uint32_t n)
 		panic("No hay suficiente memoria física\n");
 	}
 	// Si n==0 devuelvo la proxima pagina libre
-	if (n==0) {
+	if (n == 0) {
 		return nextfree;
 	} else {
 		// Me guardo la posicion actual de nextfree para luego devolverlo
@@ -176,14 +176,14 @@ mem_init(void)
 	// memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-	pages = boot_alloc(npages*sizeof(struct PageInfo));
-	memset(pages, 0, npages*sizeof(struct PageInfo));
+	pages = boot_alloc(npages * sizeof(struct PageInfo));
+	memset(pages, 0, npages * sizeof(struct PageInfo));
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
-	envs = boot_alloc(NENV*sizeof(struct Env));
-	memset(envs, 0, NENV*sizeof(struct Env));
+	envs = boot_alloc(NENV * sizeof(struct Env));
+	memset(envs, 0, NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -207,7 +207,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-	size_t size = ROUNDUP(npages*sizeof(struct PageInfo), PGSIZE);
+	size_t size = ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE);
 	boot_map_region(kern_pgdir, UPAGES, size, PADDR(pages), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
@@ -217,7 +217,7 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-	size_t size_envs = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
+	size_t size_envs = ROUNDUP(NENV * sizeof(struct Env), PGSIZE);
 	boot_map_region(kern_pgdir, UENVS, size_envs, PADDR(envs), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
@@ -231,7 +231,11 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
+	boot_map_region(kern_pgdir,
+	                KSTACKTOP - KSTKSIZE,
+	                KSTKSIZE,
+	                PADDR(bootstack),
+	                PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -295,13 +299,16 @@ mem_init_mp(void)
 	//
 	// LAB 4: Your code here:
 	int i;
-	for (i=0; i<NCPU; i++) {
+	for (i = 0; i < NCPU; i++) {
 		// Mapeo el CPU i kernel stack (el invalid memory no se mapea)
 		// Empiezo en KSTACKTOP y le voy restando i*(KSTKSIZE+KSTKGAP)
 		// para pasar al siguiente kernel stack
 		// Le resto KSTKSIZE ya que boot_map_region mapea hacia arriba
-		boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE - i*(KSTKSIZE + KSTKGAP),
-						KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
+		boot_map_region(kern_pgdir,
+		                KSTACKTOP - KSTKSIZE - i * (KSTKSIZE + KSTKGAP),
+		                KSTKSIZE,
+		                PADDR(percpu_kstacks[i]),
+		                PTE_W);
 	}
 }
 
@@ -341,28 +348,31 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
-	
-	_Static_assert(MPENTRY_PADDR % PGSIZE == 0, "MPENTRY_PADDR is not page-aligned");
-	
+
+	_Static_assert(MPENTRY_PADDR % PGSIZE == 0,
+	               "MPENTRY_PADDR is not page-aligned");
+
 	size_t i;
 	for (i = 0; i < npages; i++) {
 		// nextfree page physicall address
 		physaddr_t first_free_page = PADDR((char *) boot_alloc(0));
 		// actual page physicall address
 		physaddr_t page_pa = page2pa(&pages[i]);
-		
+
 		// Las siguientes condiciones me indican memoria invalida:
 		// - Pagina 0
-		bool first_page = i==0;
+		bool first_page = i == 0;
 		// - Espacio para I/O (desde IOPHYSMEM hasta EXTPHYSMEM)
 		bool io_space = page_pa >= IOPHYSMEM && page_pa <= EXTPHYSMEM;
 		// - Espacio para el kernel y boot_alloc (desde EXTPHYSMEM hasta nextfree)
-		bool kernel_boot_alloc_space = page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
+		bool kernel_boot_alloc_space =
+		        page_pa >= EXTPHYSMEM && page_pa <= first_free_page;
 		// - Pagina 7 se reserva para el arranque
-		bool mpentry_page = i==7;
+		bool mpentry_page = i == 7;
 
 		// No las agrego a la lista de paginas libres
-		bool invalid_page = first_page || io_space || kernel_boot_alloc_space || mpentry_page;
+		bool invalid_page = first_page || io_space ||
+		                    kernel_boot_alloc_space || mpentry_page;
 		if (invalid_page) {
 			continue;
 		}
@@ -403,7 +413,7 @@ page_alloc(int alloc_flags)
 	// Ponemos en 0 los 4KB (PGSIZE) de la pagina alocada
 	// Con esto limpiamos basura que haya quedado
 	// En particular algun bit PTE_P en 1
-	if (alloc_flags==ALLOC_ZERO) {
+	if (alloc_flags == ALLOC_ZERO) {
 		memset(page2kva(free_page), '\0', PGSIZE);
 	}
 	return free_page;
@@ -475,16 +485,16 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Page table entry (aca se carga la virtual address de la page table)
 	pte_t *pgtab_addr;
-	
+
 	// Me guardo el offset en la page directory (primeros 10 bits de va)
 	int pgdir_offset = PDX(va);
 	// Me guardo el offset en la page table (segundos 10 bits de va)
 	int pgtab_offset = PTX(va);
-	
+
 	// Si no esta el bit de presencia (PTE_P) --> no hay page table asociada a la page directory
 	if (!(pgdir[pgdir_offset] & PTE_P)) {
 		// Si create == 0 --> devuelvo null y no hago nada
-		if (create==0) {
+		if (create == 0) {
 			return NULL;
 		}
 		// Creo una nueva page table
@@ -494,17 +504,20 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		if (!new_page_table) {
 			return NULL;
 		}
-		new_page_table->pp_ref ++;
-		// Cargo en el registro de la page directory la direccion fisica de la nueva page table
-		// Y le asigno el bit de presencia (PTE_P) y los permisos (PTE_U y PTE_W)
-		pgdir[pgdir_offset] = page2pa(new_page_table) | PTE_P | PTE_U | PTE_W;
+		new_page_table->pp_ref++;
+		// Cargo en el registro de la page directory la direccion fisica
+		// de la nueva page table Y le asigno el bit de presencia
+		// (PTE_P) y los permisos (PTE_U y PTE_W)
+		pgdir[pgdir_offset] =
+		        page2pa(new_page_table) | PTE_P | PTE_U | PTE_W;
 		// Convierto la nueva page table a virtual address
 		pgtab_addr = page2kva(new_page_table);
 	} else {
-		// Me guardo la direccion fisica de la page table asociada (primeros 20 bits del registro del page directory)
-		// pgdir[pgdir_offset] es la posicion dentro del page directory --> = pgdir + pgdir_offset
+		// Me guardo la direccion fisica de la page table asociada (primeros
+		// 20 bits del registro del page directory) pgdir[pgdir_offset]
+		// es la posicion dentro del page directory --> = pgdir + pgdir_offset
 		physaddr_t pgtable_phys_addr = PTE_ADDR(pgdir[pgdir_offset]);
-		
+
 		// Convierto la direccion fisica de la page table a virtual address
 		pgtab_addr = KADDR(pgtable_phys_addr);
 	}
@@ -527,7 +540,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	#ifdef TP1_PSE
+#ifdef TP1_PSE
 	// Implementacion para large pages
 	uintptr_t actual_va;
 	physaddr_t actual_pa;
@@ -535,7 +548,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	int aux_size;
 	uintptr_t i;
 
-	for (i=0; i<size; i+=aux_size) {
+	for (i = 0; i < size; i += aux_size) {
 		// Actualizo las direcciones virtuales y fisicas
 		actual_va = va + i;
 		actual_pa = pa + i;
@@ -547,20 +560,21 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 			pgdir[PDX(actual_va)] = actual_pa | perm | PTE_P | PTE_PS;
 			aux_size = PTSIZE;
 		} else {
-		// Si no, aplico la logica original (avanzo de a PGSIZE)
-			pte_t *pgtab_addr = pgdir_walk(pgdir, (void *) actual_va, 1);
+			// Si no, aplico la logica original (avanzo de a PGSIZE)
+			pte_t *pgtab_addr =
+			        pgdir_walk(pgdir, (void *) actual_va, 1);
 			*pgtab_addr = actual_pa | perm | PTE_P;
 			aux_size = PGSIZE;
 		}
 	}
 
-	#else
+#else
 	// Implementacion original
 	uintptr_t actual_va;
 	physaddr_t actual_pa;
 	uintptr_t i;
 	// Recorro las direcciones de a PGSIZE bytes
-	for (i=0; i<size; i+=PGSIZE) {
+	for (i = 0; i < size; i += PGSIZE) {
 		// Actualizo las direcciones virtuales y fisicas
 		actual_va = va + i;
 		actual_pa = pa + i;
@@ -569,9 +583,8 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		// Referencio el page table entry con la direccion fisica de la PageInfo + los bits de permiso
 		*pgtab_addr = actual_pa | perm | PTE_P;
 	}
-	#endif
+#endif
 }
-
 
 
 //
@@ -641,7 +654,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 
 	// Obtengo la direccion de la page table entry
 	pte_t *pgtab_addr = pgdir_walk(pgdir, va, 0);
-	if (!pgtab_addr){
+	if (!pgtab_addr) {
 		return NULL;
 	}
 	// Obtengo la direccion fisica a donde apunta el page table entry
@@ -650,10 +663,10 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 	physaddr_t page_phys_addr = pgtable_phys_addr + phys_offset;
 
 	// Guardo la direccion fisica del page table entry en pte_store
-	if (pte_store != 0){
+	if (pte_store != 0) {
 		*pte_store = pgtab_addr;
 	}
-	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida 
+	// Devuelvo el struct PageInfo asociado a la direccion fisica obtenida
 	return pa2page(page_phys_addr);
 }
 
@@ -679,7 +692,7 @@ page_remove(pde_t *pgdir, void *va)
 	// Me guardo en pgtab_addr el page table entry
 	pte_t *pgtab_addr;
 	struct PageInfo *mapped_page = page_lookup(pgdir, va, &pgtab_addr);
-	if (!mapped_page){
+	if (!mapped_page) {
 		return;
 	}
 	// Decremento el pp_ref y libero la pagina si pp_ref llega a cero
@@ -736,14 +749,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	//panic("mmio_map_region not implemented");
+	// panic("mmio_map_region not implemented");
 
 	// Me guardo la base previa
 	uintptr_t prev_base = base;
-	
+
 	int perm = PTE_W | PTE_PCD | PTE_PWT;
 	size_t size_aligned = ROUNDUP(size, PGSIZE);
-	
+
 	// Chequeo que no se pase de MMIOLIM
 	if (base + size_aligned > MMIOLIM) {
 		panic("Overflow MMIOLIM");
@@ -784,25 +797,26 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	// Alineo va a PGSIZE (down)
 	size_t va_aligned = ROUNDDOWN((size_t) va, PGSIZE);
 	// Alineo va+len a PGSIZE (up)
-	size_t space_aligned = ROUNDUP((size_t) va+len, PGSIZE);
+	size_t space_aligned = ROUNDUP((size_t) va + len, PGSIZE);
 
 	// Realizo un ciclo para los len bytes
 	size_t i;
-	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
+	for (i = va_aligned; i < space_aligned; i += PGSIZE) {
 		// Obtengo la pagina actual del pgdir del proceso
-		pte_t *actual_page = pgdir_walk(env->env_pgdir, (const void *) i, 0);
+		pte_t *actual_page =
+		        pgdir_walk(env->env_pgdir, (const void *) i, 0);
 
-		// Las siguientes condiciones me indican acceso a memoria valida:
-		// (0) existe actual page
+		// Las siguientes condiciones me indican acceso a memoria
+		// valida: (0) existe actual page
 		bool page_ok = actual_page;
 		// (1) va < ULIM
 		bool ulim_va = i < ULIM;
 		// (2) permisos aceptados por la page table
 		bool perm_ok = ((*actual_page & perm) == perm);
-		
+
 		// Si la va no es accesible, me guardo la primera va erronea y devuelvo
 		bool allowed_va = page_ok && ulim_va && perm_ok;
-		
+
 		if (!allowed_va) {
 			// Si i < va --> me guardo va
 			bool i_lower_than_va = i < (size_t) va;

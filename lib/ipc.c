@@ -24,7 +24,7 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
 	// LAB 4: Your code here.
 	// panic("ipc_recv not implemented");
-	
+
 	// Guardo la pagina enviada por el emisor
 	uintptr_t dstva;
 	if (pg) {
@@ -35,8 +35,10 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	// Llamo a la syscall
 	int r;
 	if ((r = sys_ipc_recv((void *) dstva)) < 0) {
-		if (from_env_store) *from_env_store = 0;
-		if (perm_store) *perm_store = 0;
+		if (from_env_store)
+			*from_env_store = 0;
+		if (perm_store)
+			*perm_store = 0;
 		return r;
 	}
 	// Guardo el envid del emisor
@@ -79,7 +81,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 	while (!message_sent) {
 		// Llamo a la syscall
 		if ((r = sys_ipc_try_send(to_env, val, (void *) srcva, perm)) < 0) {
-			if (r==-E_IPC_NOT_RECV) {
+			if (r == -E_IPC_NOT_RECV) {
 				sys_yield();
 			} else {
 				panic("ipc_send error: %e", r);

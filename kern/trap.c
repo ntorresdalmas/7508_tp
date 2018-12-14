@@ -175,17 +175,20 @@ trap_init_percpu(void)
 	uint16_t seg = idx << 3;
 
 	// Seteo el TSS para obtener el stack correcto cuando trapeamos al kernel
-	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - id*(KSTKSIZE + KSTKGAP);
+	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - id * (KSTKSIZE + KSTKGAP);
 	thiscpu->cpu_ts.ts_ss0 = GD_KD;
 	thiscpu->cpu_ts.ts_iomb = sizeof(struct Taskstate);
 
 	// Inicializo el TSS slot para la GDT
-	gdt[idx] = SEG16(STS_T32A, (uint32_t)(&thiscpu->cpu_ts), sizeof(struct Taskstate) - 1, 0);
+	gdt[idx] = SEG16(STS_T32A,
+	                 (uint32_t)(&thiscpu->cpu_ts),
+	                 sizeof(struct Taskstate) - 1,
+	                 0);
 	gdt[idx].sd_s = 0;
 
 	// Cargo la TSS selector para cada core adicional
 	// (like other segment selectors, the bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0 + 8*id);
+	ltr(GD_TSS0 + 8 * id);
 
 	// Cargo la IDT
 	lidt(&idt_pd);
@@ -199,8 +202,8 @@ trap_init_percpu(void)
 
 	// Initialize the TSS slot of the gdt.
 	gdt[GD_TSS0 >> 3] =
-	        SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1, 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
+	        SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1,
+	0); gdt[GD_TSS0 >> 3].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
@@ -272,15 +275,15 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	}
 
-	if(tf->tf_trapno == T_SYSCALL) {
+	if (tf->tf_trapno == T_SYSCALL) {
 		// Le paso los parametros segun la convencion definida en lib\syscall.c
 		// Me guardo el valor de retorno de la syscall en %eax
 		tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax,
-									  tf->tf_regs.reg_edx,
-									  tf->tf_regs.reg_ecx,
-									  tf->tf_regs.reg_ebx,
-									  tf->tf_regs.reg_edi,
-									  tf->tf_regs.reg_esi);
+		                              tf->tf_regs.reg_edx,
+		                              tf->tf_regs.reg_ecx,
+		                              tf->tf_regs.reg_ebx,
+		                              tf->tf_regs.reg_edi,
+		                              tf->tf_regs.reg_esi);
 		return;
 	}
 
@@ -349,7 +352,7 @@ trap(struct Trapframe *tf)
 		// serious kernel work.
 		// LAB 4: Your code here.
 		lock_kernel();
-		
+
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie
@@ -433,22 +436,26 @@ page_fault_handler(struct Trapframe *tf)
 
 	// LAB 4: Your code here.
 
-	if (curenv->env_pgfault_upcall){
+	if (curenv->env_pgfault_upcall) {
 		struct UTrapframe *utrap;
 
 		// Caso recursivo:
 		// Si se cumple esta condicion, quiere decir que el page fault handler genero el fault
-		bool tf_in_xstack = (tf->tf_esp >= UXSTACKTOP - PGSIZE) && (tf->tf_esp < UXSTACKTOP);
-		
+		bool tf_in_xstack = (tf->tf_esp >= UXSTACKTOP - PGSIZE) &&
+		                    (tf->tf_esp < UXSTACKTOP);
+
 		// Si tf_in_xstack --> el top del nuevo stack va debajo del que estaba corriendo
 		//					   esto seria = tf->tf_esp - 4 (por el word en blanco)
 		// Si no 		   --> el top del nuevo stack va en UXSTACKTOP
-		uintptr_t ustack_top = tf_in_xstack ? (tf->tf_esp - 4) : UXSTACKTOP;
+		uintptr_t ustack_top =
+		        tf_in_xstack ? (tf->tf_esp - 4) : UXSTACKTOP;
 		uintptr_t ustack_bottom = ustack_top - sizeof(struct UTrapframe);
 
 		// Chequeo que el curenv tiene permitido acceder al espacio de memoria
-		user_mem_assert(curenv, (const void*) ustack_bottom,
-						sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
+		user_mem_assert(curenv,
+		                (const void *) ustack_bottom,
+		                sizeof(struct UTrapframe),
+		                PTE_U | PTE_P | PTE_W);
 
 		// Inicializo el UTrapframe en la direccion correspondiente
 		utrap = (struct UTrapframe *) ustack_bottom;
@@ -460,20 +467,20 @@ page_fault_handler(struct Trapframe *tf)
 		utrap->utf_eflags = tf->tf_eflags;
 		utrap->utf_eip = tf->tf_eip;
 		utrap->utf_esp = tf->tf_esp;
-		
+
 		// Cambio a donde se va a ejecutar el proceso
 		tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
 		tf->tf_esp = (uintptr_t) utrap;
-		
+
 		// Ejecuto el curenv segun el nuevo eip y esp
 		env_run(curenv);
 	} else {
-	// Destruyo el proceso que ocasiono el fault
+		// Destruyo el proceso que ocasiono el fault
 		cprintf("[%08x] user fault va %08x ip %08x\n",
 		        curenv->env_id,
 		        fault_va,
 		        tf->tf_eip);
 		print_trapframe(tf);
-		env_destroy(curenv);		
+		env_destroy(curenv);
 	}
 }

@@ -14,7 +14,7 @@
 static void
 pgfault(struct UTrapframe *utf)
 {
-	//panic("pgfault not implemented");
+	// panic("pgfault not implemented");
 
 	void *addr = (void *) utf->utf_fault_va;
 	uint32_t err = utf->utf_err;
@@ -53,14 +53,15 @@ pgfault(struct UTrapframe *utf)
 
 	int r;
 	// Reservo una nueva pagina temporal
-	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
-			panic("sys_page_alloc: %e", r);
+	if ((r = sys_page_alloc(0, PFTEMP, PTE_P | PTE_U | PTE_W)) < 0) {
+		panic("sys_page_alloc: %e", r);
 	}
 	// Copio el contenido original a la nueva pagina temporal (addr --> PFTEMP)
 	memmove(PFTEMP, addr_aligned, PGSIZE);
-	
+
 	// Mapeo la nueva pagina temporal a la original
-	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P|PTE_U|PTE_W)) < 0) {
+	if ((r = sys_page_map(0, PFTEMP, 0, addr_aligned, PTE_P | PTE_U | PTE_W)) <
+	    0) {
 		panic("sys_page_map: %e", r);
 	}
 	// Elimino la nueva pagina temporal
@@ -84,8 +85,8 @@ static int
 duppage(envid_t envid, unsigned pn)
 {
 	// LAB 4: Your code here.
-	//panic("duppage not implemented");
-	
+	// panic("duppage not implemented");
+
 	// Obtengo la va de la pagina pn
 	uintptr_t va = (uintptr_t) pn * PGSIZE;
 
@@ -94,10 +95,10 @@ duppage(envid_t envid, unsigned pn)
 
 	// Me quedo con los bits de permisos
 	int father_perm = actual_pte & PTE_SYSCALL;
-	
+
 	// Inicialmente los permisos del hijo son heredados del padre
 	int child_perm = father_perm;
-	
+
 	// Si el padre tiene activado PTE_W, se lo desactivo al hijo
 	// y a su vez le activo el PTE_COW
 	bool is_writeable = (father_perm & PTE_W);
@@ -106,8 +107,8 @@ duppage(envid_t envid, unsigned pn)
 		child_perm |= PTE_COW;
 	}
 
-	// Si el padre tiene activado PTE_SHARE, se mantienen los permisos del padre
-	// Lo de arriba (is_writeable) queda en desuso
+	// Si el padre tiene activado PTE_SHARE, se mantienen los permisos del
+	// padre Lo de arriba (is_writeable) queda en desuso
 	bool is_shareable = (father_perm & PTE_SHARE);
 	if (is_shareable) {
 		child_perm = father_perm;
@@ -115,12 +116,14 @@ duppage(envid_t envid, unsigned pn)
 
 	// Mapeo en el hijo la pagina fisica en la misma va
 	int r;
-	if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) < 0) {
+	if ((r = sys_page_map(0, (void *) va, envid, (void *) va, child_perm)) <
+	    0) {
 		panic("sys_page_map: %e", r);
 	}
 	// Si los permisos resultantes del hijo incluyen PTE_COW, se los paso al padre
 	if (child_perm & PTE_COW) {
-		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) < 0) {
+		if ((r = sys_page_map(0, (void *) va, 0, (void *) va, child_perm)) <
+		    0) {
 			panic("sys_page_map: %e", r);
 		}
 	}
@@ -138,11 +141,12 @@ dup_or_share(envid_t dstenv, void *va, int perm)
 			panic("sys_page_map: %e", r);
 		}
 	} else {
-	// Si no, la copio
-		if ((r = sys_page_alloc(dstenv, va, PTE_P|PTE_U|PTE_W)) < 0) {
+		// Si no, la copio
+		if ((r = sys_page_alloc(dstenv, va, PTE_P | PTE_U | PTE_W)) < 0) {
 			panic("sys_page_alloc: %e", r);
 		}
-		if ((r = sys_page_map(dstenv, va, 0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0) {
+		if ((r = sys_page_map(dstenv, va, 0, UTEMP, PTE_P | PTE_U | PTE_W)) <
+		    0) {
 			panic("sys_page_map: %e", r);
 		}
 		memmove(UTEMP, va, PGSIZE);
@@ -171,7 +175,7 @@ fork_v0(void)
 	// Es el proceso padre
 	bool is_maped;
 	int va;
-	for (va=0; va<UTOP; va+=PGSIZE) {
+	for (va = 0; va < UTOP; va += PGSIZE) {
 		// Obtengo la direccion del page directory entry
 		pde_t actual_pde = uvpd[PDX(va)];
 		// Si tiene el bit de presencia --> hay una pagina mapeada
@@ -184,7 +188,9 @@ fork_v0(void)
 			is_maped = (actual_pte & PTE_P);
 			// Si hay pagina mapeada, la comparto con el hijo
 			if (is_maped) {
-				dup_or_share(envid, (void *) va, actual_pte | PTE_SYSCALL);
+				dup_or_share(envid,
+				             (void *) va,
+				             actual_pte | PTE_SYSCALL);
 			}
 		}
 	}
@@ -193,7 +199,7 @@ fork_v0(void)
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0) {
 		panic("sys_env_set_status: %e", r);
 	}
-	return envid;	
+	return envid;
 }
 
 //
@@ -216,13 +222,13 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	//panic("fork not implemented");
+	// panic("fork not implemented");
 
-	//return fork_v0();
+	// return fork_v0();
 
 	int r;
 	extern void _pgfault_upcall(void);
-	
+
 	// Instalo en el padre la funcion 'pgfault' como handler de page faults
 	// Tambien reservo memoria para su UXSTACK
 	set_pgfault_handler(pgfault);
@@ -238,11 +244,13 @@ fork(void)
 	if (envid == 0) {
 		// Actualizo la variable thisenv ya que referencia al padre
 		thisenv = &envs[ENVX(sys_getenvid())];
-	
+
 		return 0;
 	}
 	// Reservo memoria para el UXSTACK del hijo
-	if ((r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0) {
+	if ((r = sys_page_alloc(envid,
+	                        (void *) (UXSTACKTOP - PGSIZE),
+	                        PTE_U | PTE_P | PTE_W)) < 0) {
 		panic("sys_page_alloc: %e", r);
 	}
 	// Instalo el handler de excepciones en el hijo
@@ -252,8 +260,8 @@ fork(void)
 	bool is_maped;
 	bool va_in_xstack;
 	int va;
-	
-	for (va=0; va<UTOP; va+=PGSIZE) {
+
+	for (va = 0; va < UTOP; va += PGSIZE) {
 		// La region correspondiente a la pila de excepciones (UXSTACK) no se mapea
 		va_in_xstack = (va >= UXSTACKTOP - PGSIZE) && (va < UXSTACKTOP);
 

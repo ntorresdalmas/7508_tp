@@ -62,8 +62,8 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	//panic("alloc_block not implemented");
-	
+	// panic("alloc_block not implemented");
+
 	int r;
 
 	// Recorro todos los bloques del disco y chequedo c/u en el bitmap
@@ -75,7 +75,8 @@ alloc_block(void)
 	for (i = 0; i < super->s_nblocks; i++) {
 		if (block_is_free(i)) {
 			// Reservo una nueva pagina para el bloque
-			if ((r = sys_page_alloc(0, diskaddr(i), PTE_P|PTE_U|PTE_W)) < 0) {
+			if ((r = sys_page_alloc(
+			             0, diskaddr(i), PTE_P | PTE_U | PTE_W)) < 0) {
 				panic("sys_page_alloc: %e", r);
 			}
 			// Actualizo el bitmap (1: libre --> 0: ocupado)
@@ -156,7 +157,7 @@ static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
 	// LAB 5: Your code here.
-	//panic("file_block_walk not implemented");
+	// panic("file_block_walk not implemented");
 
 	if (filebno >= NDIRECT + NINDIRECT) {
 		return -E_INVAL;
@@ -166,7 +167,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 		// Me guardo la direccion del bloque
 		*ppdiskbno = &f->f_direct[filebno];
 	} else {
-	// Bloques indirectos
+		// Bloques indirectos
 		// No hay bloque indirecto alocado
 		if (f->f_indirect == 0) {
 			if (!alloc) {
@@ -206,7 +207,7 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
-	//panic("file_get_block not implemented");
+	// panic("file_get_block not implemented");
 
 	if (filebno >= NDIRECT + NINDIRECT) {
 		return -E_INVAL;

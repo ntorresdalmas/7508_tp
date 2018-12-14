@@ -42,10 +42,10 @@ sched_yield(void)
 	} else {
 		index_nextenv = 0;
 	}
-	
+
 	int index_actual;
 	int i;
-	for (i=0; i<NENV; i++) {
+	for (i = 0; i < NENV; i++) {
 		index_actual = (index_nextenv + i) % NENV;
 
 		if (envs[index_actual].env_status == ENV_RUNNABLE) {

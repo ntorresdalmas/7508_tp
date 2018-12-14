@@ -120,10 +120,10 @@ env_init(void)
 	for (i = NENV; i > 0; i--) {
 		// Armo la lista enlazada de envs libres de modo tal que
 		// en la primera llamada a env_init --> env_free_list = envs[0]
-		envs[i-1].env_status = ENV_FREE;
-		envs[i-1].env_id = 0;
-		envs[i-1].env_link = env_free_list;
-		env_free_list = &envs[i-1];
+		envs[i - 1].env_status = ENV_FREE;
+		envs[i - 1].env_id = 0;
+		envs[i - 1].env_link = env_free_list;
+		env_free_list = &envs[i - 1];
 	}
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -298,19 +298,21 @@ region_alloc(struct Env *e, void *va, size_t len)
 	// Alineo va a PGSIZE (down)
 	size_t va_aligned = ROUNDDOWN((size_t) va, PGSIZE);
 	// Alineo va+len a PGSIZE (up)
-	size_t space_aligned = ROUNDUP((size_t) va+len, PGSIZE);
+	size_t space_aligned = ROUNDUP((size_t) va + len, PGSIZE);
 
 	// Realizo un ciclo para los len bytes
 	size_t i;
-	for (i=va_aligned; i<space_aligned; i+=PGSIZE) {
+	for (i = va_aligned; i < space_aligned; i += PGSIZE) {
 		// Aloco una pagina fisica
 		struct PageInfo *new_page = page_alloc(0);
 		if (!new_page) {
 			panic("Error al alocar la pagina fisica");
 		}
 		// Mapeo la pagina fisica con la va actual en el pgdir del proceso
-		if (page_insert(e->env_pgdir, new_page, (void *) i, PTE_U | PTE_W) < 0) {
-			panic("Error al mapear la pagina fisica en la direccion virtual");
+		if (page_insert(e->env_pgdir, new_page, (void *) i, PTE_U | PTE_W) <
+		    0) {
+			panic("Error al mapear la pagina fisica en la "
+			      "direccion virtual");
 		}
 	}
 }
@@ -390,9 +392,13 @@ load_icode(struct Env *e, uint8_t *binary)
 			// Aloco el size del segmento en memoria fisica y lo mapeo a su va
 			region_alloc(e, (void *) ph->p_va, (size_t) ph->p_memsz);
 			// Copio los bytes del segmento a su va
-			memcpy((void *) ph->p_va, binary + ph->p_offset, (size_t) ph->p_filesz);
+			memcpy((void *) ph->p_va,
+			       binary + ph->p_offset,
+			       (size_t) ph->p_filesz);
 			// Seteo los bytes restantes del segmento en 0
-			memset((void *) (ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+			memset((void *) (ph->p_va + ph->p_filesz),
+			       0,
+			       ph->p_memsz - ph->p_filesz);
 		}
 		ph++;
 	}
@@ -423,7 +429,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	// LAB 3: Your code here.
 	struct Env *new_env;
 	envid_t parent_id = 0;
-	
+
 	// Aloco un nuevo proceso
 	int err = env_alloc(&new_env, parent_id);
 	if (err < 0) {
@@ -579,7 +585,7 @@ env_run(struct Env *e)
 	// Seteo el nuevo proceso en ejecucion
 	curenv = e;
 	e->env_status = ENV_RUNNING;
-	e->env_runs ++;
+	e->env_runs++;
 
 	// Cambio el espacio virtual de direcciones (kernel --> proceso)
 	lcr3(PADDR(e->env_pgdir));

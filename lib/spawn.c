@@ -326,7 +326,7 @@ copy_shared_pages(envid_t child)
 
 	bool is_maped, is_shareable;
 	int va;
-	for (va=0; va<UTOP; va+=PGSIZE) {
+	for (va = 0; va < UTOP; va += PGSIZE) {
 		// Obtengo la direccion del page directory entry
 		pde_t actual_pde = uvpd[PDX(va)];
 		// Si tiene el bit de presencia --> hay una pagina mapeada
@@ -339,9 +339,13 @@ copy_shared_pages(envid_t child)
 			is_maped = (actual_pte & PTE_P);
 			// Si tiene el bit de compartir --> la comparto con el hijo
 			is_shareable = (actual_pte & PTE_SHARE);
-			
+
 			if (is_maped && is_shareable) {
-				sys_page_map(0, (void *) va, child, (void *) va, actual_pte | PTE_SYSCALL);
+				sys_page_map(0,
+				             (void *) va,
+				             child,
+				             (void *) va,
+				             actual_pte | PTE_SYSCALL);
 			}
 		}
 	}

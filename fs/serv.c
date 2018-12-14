@@ -226,15 +226,15 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	struct OpenFile *o;
 	int r;
 	// Me guardo el openfile en o
-	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0) {
 		return r;
 	}
 	// File Descriptor
-	struct Fd* fd = o->o_fd;
+	struct Fd *fd = o->o_fd;
 	// Offset (seek) en el archivo
 	off_t offset = fd->fd_offset;
 	// Archivo actual
-	struct File* file = o->o_file;
+	struct File *file = o->o_file;
 	// Tamaño del archivo en bytes
 	off_t file_size = file->f_size;
 	// Bytes a leer
@@ -250,7 +250,8 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	// Leo 'bytes to read' bytes a partir del offset (file --> ret_buf)
 	// La cantidad leida me queda en 'bytes_read'
 	int bytes_read;
-	if ((bytes_read = file_read(file, ret->ret_buf, bytes_to_read, offset)) < 0){
+	if ((bytes_read = file_read(file, ret->ret_buf, bytes_to_read, offset)) <
+	    0) {
 		return bytes_read;
 	}
 	// Actualizo el offset (seek) segun los bytes leidos
@@ -274,20 +275,20 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		        req->req_n);
 
 	// LAB 5: Your code here.
-	//panic("serve_write not implemented");
+	// panic("serve_write not implemented");
 
 	struct OpenFile *o;
 	int r;
 	// Me guardo el openfile en o.
-	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0){
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0) {
 		return r;
 	}
 	// File Descriptor
-	struct Fd* fd = o->o_fd;
+	struct Fd *fd = o->o_fd;
 	// Offset (seek) en el archivo
 	off_t offset = fd->fd_offset;
 	// Archivo actual
-	struct File* file = o->o_file;
+	struct File *file = o->o_file;
 	// Tamaño del archivo en bytes
 	off_t file_size = file->f_size;
 	// Cantidad de bytes a escribir
@@ -296,7 +297,8 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	// Escribo 'bytes to write' bytes a partir del offset (ret_buf --> file)
 	// La cantidad escrita me queda en 'bytes_written'
 	int bytes_written;
-	if ((bytes_written = file_write(file, req->req_buf, bytes_to_write, offset)) < 0){
+	if ((bytes_written =
+	             file_write(file, req->req_buf, bytes_to_write, offset)) < 0) {
 		return bytes_written;
 	}
 

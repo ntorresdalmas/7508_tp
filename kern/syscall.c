@@ -172,8 +172,7 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 	e->env_tf.tf_ss |= 3;
 	e->env_tf.tf_cs |= 3;
 
-	//
-	tf->tf_eflags = (tf->tf_eflags & ~FL_IOPL_3);
+	e->env_tf.tf_eflags &= ~FL_IOPL_3;
 	// Le habilito interrupciones y pongo el IOPL a 0
 	e->env_tf.tf_eflags |= (FL_IF | FL_IOPL_0);
 

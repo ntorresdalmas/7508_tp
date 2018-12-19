@@ -158,10 +158,8 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 	}
 
 	// Chequeo que tf apunte a memoria de usuario valida
-	uintptr_t stack_top = tf->tf_esp;
-	uintptr_t stack_bottom = stack_top - sizeof(struct Trapframe);
 	user_mem_assert(e,
-	                (const void *) stack_bottom,
+	                (const void *) tf,
 	                sizeof(struct Trapframe),
 	                PTE_U | PTE_P | PTE_W);
 
@@ -174,6 +172,8 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 	e->env_tf.tf_ss |= 3;
 	e->env_tf.tf_cs |= 3;
 
+	//
+	tf->tf_eflags = (tf->tf_eflags & ~FL_IOPL_3);
 	// Le habilito interrupciones y pongo el IOPL a 0
 	e->env_tf.tf_eflags |= (FL_IF | FL_IOPL_0);
 

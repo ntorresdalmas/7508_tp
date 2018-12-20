@@ -62,7 +62,8 @@ def test_spawn():
 @test(5, "Protection I/O space")
 def test_faultio():
     r.user_test("spawnfaultio")
-    r.match('TRAP')
+    r.match('  trap 0x0000000d General Protection',
+            no=['eflags wrong', 'faultio: made it here --- bug'])
 
 @test(10, "PTE_SHARE [testpteshare]")
 def test_pte_share():
